@@ -1,0 +1,1115 @@
+﻿@page "/industrial-dashboard"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using System.Threading
+@inject CA2_Project.Services.MqttDashboardService Mqtt
+
+<PageTitle>Industrial IIoT Dashboard</PageTitle>
+
+<div class="container-fluid py-4">
+
+    <!-- HEADER -->
+    <div class="mb-4">
+        <h2>Industrial IIoT Dashboard</h2>
+        <p class="text-muted">
+            Conveyor Monitoring and Remote Control System
+        </p>
+
+        <span class="badge bg-warning text-dark">
+            DEVELOPMENT / TEST MODE
+        </span>
+    </div>
+
+    <!-- DATA SOURCE SELECTION -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5>Monitoring Data Source</h5>
+
+            <p class="text-muted">
+                Choose local simulation or MQTT telemetry.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn @(UseMqttMode ? "btn-outline-primary" : "btn-primary")"
+                        @onclick="SelectSimulationMode">
+                    Simulation Mode
+                </button>
+
+                <button class="btn @(UseMqttMode ? "btn-success" : "btn-outline-success")"
+                        @onclick="SelectMqttMode">
+                    MQTT Monitoring Mode
+                </button>
+            </div>
+
+            <p class="mt-3 mb-1">
+                <strong>Selected Mode:</strong>
+                @(UseMqttMode ? "MQTT TELEMETRY" : "SIMULATION")
+            </p>
+
+            @if (UseMqttMode && !HasLiveData)
+            {
+                <div class="alert alert-warning mt-3 mb-0">
+                    MQTT telemetry unavailable or outdated.
+                    Connect the broker and publish fresh sensor data.
+                </div>
+            }
+
+            @if (UseMqttMode && HasLiveData)
+            {
+                <div class="alert alert-info mt-3 mb-0">
+                    MQTT telemetry is being displayed.
+                    Sensor values currently come from a test publisher.
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- STATUS CARDS -->
+    <div class="row g-3 mb-4">
+
+        <!-- System Status -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6>System Status</h6>
+
+                    @if (!DataAvailable)
+                    {
+                        <h3 class="text-secondary">NO DATA</h3>
+                    }
+                    else
+                    {
+                        <h3 class="@(DisplayRun ? "text-success" : "text-secondary")">
+                            @(DisplayRun ? "RUNNING" : "STOPPED")
+                        </h3>
+                    }
+
+                    <small>
+                        @(UseMqttMode ? "MQTT-reported Run Enable" : "Simulated Run Enable")
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- PNP Sensor -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6>PNP Proximity Sensor</h6>
+
+                    @if (!DataAvailable)
+                    {
+                        <h3 class="text-secondary">NO DATA</h3>
+                    }
+                    else
+                    {
+                        <h3 class="@(DisplaySensor ? "text-success" : "text-secondary")">
+                            @(DisplaySensor ? "DETECTED" : "NOT DETECTED")
+                        </h3>
+                    }
+
+                    <small>
+                        @(UseMqttMode ? "MQTT Sensor Data" : "Simulated Digital Input")
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Temperature -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6>Temperature</h6>
+
+                    @if (!DataAvailable)
+                    {
+                        <h3 class="text-secondary">NO DATA</h3>
+                    }
+                    else
+                    {
+                        <h3 class="@(DisplayAlarm ? "text-danger" : "text-success")">
+                            @DisplayTemperature.ToString("F1") °C
+                        </h3>
+                    }
+
+                    <small>
+                        Threshold: @Threshold.ToString("F1") °C
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device Health -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6>Device Health</h6>
+
+                    @if (UseMqttMode)
+                    {
+                        <h3 class="@(HasLiveData ? "text-success" : "text-danger")">
+                            @(HasLiveData ? "DATA FRESH" : "DATA UNAVAILABLE")
+                        </h3>
+
+                        <small>MQTT data freshness</small>
+                    }
+                    else
+                    {
+                        <h3 class="@(HasFault ? "text-danger" : "text-success")">
+                            @(HasFault ? "FAULT" : "ONLINE")
+                        </h3>
+
+                        <small>Simulated heartbeat monitoring</small>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEMPERATURE ALARM -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5>Temperature Alarm Monitoring</h5>
+
+            @if (!DataAvailable)
+            {
+                <div class="alert alert-warning mb-0">
+                    <strong>TEMPERATURE DATA UNAVAILABLE</strong>
+                    <div>
+                        No fresh MQTT temperature reading is available.
+                        Alarm condition cannot be confirmed.
+                    </div>
+                </div>
+            }
+            else if (DisplayAlarm)
+            {
+                <div class="alert alert-danger mb-0">
+                    <strong>HIGH TEMPERATURE ALERT!</strong>
+                    <div>
+                        Temperature:
+                        @DisplayTemperature.ToString("F1") °C
+                    </div>
+                    <div>
+                        Alarm Threshold:
+                        @Threshold.ToString("F1") °C
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success mb-0">
+                    <strong>NORMAL</strong>
+                    <div>
+                        Temperature is below the defined threshold.
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- THRESHOLD CONFIGURATION -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5>Temperature Threshold Configuration</h5>
+
+            <p class="text-muted">
+                Set the temperature alarm threshold.
+            </p>
+
+            <label class="form-label">
+                Selected Threshold:
+                <strong>@DraftThreshold.ToString("F1") °C</strong>
+            </label>
+
+            <input type="range"
+                   class="form-range"
+                   min="10"
+                   max="70"
+                   step="1"
+                   @bind="DraftThreshold"
+                   @bind:event="oninput" />
+
+            <button class="btn btn-primary"
+                    @onclick="ApplyThreshold">
+                Apply Threshold
+            </button>
+
+            <p class="mt-3 mb-0">
+                Active Threshold:
+                <strong>@Threshold.ToString("F1") °C</strong>
+            </p>
+        </div>
+    </div>
+
+    <!-- MQTT COMMUNICATION -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5>MQTT Communication</h5>
+
+            <p class="text-muted">
+                Local Mosquitto Broker - 127.0.0.1:1883
+            </p>
+
+            <p>
+                <strong>Broker Status:</strong>
+                <span class="@(Mqtt.IsConnected ? "text-success" : "text-danger")">
+                    @(Mqtt.IsConnected ? "CONNECTED" : "DISCONNECTED")
+                </span>
+            </p>
+
+            <div class="d-flex flex-wrap gap-2 mb-3">
+
+                <button class="btn btn-primary"
+                        disabled="@Mqtt.IsConnected"
+                        @onclick="ConnectMqtt">
+                    Connect MQTT
+                </button>
+
+                <button class="btn btn-success"
+                        disabled="@(!Mqtt.IsConnected)"
+                        @onclick="PublishStart">
+                    Publish START
+                </button>
+
+                <button class="btn btn-danger"
+                        disabled="@(!Mqtt.IsConnected)"
+                        @onclick="PublishStop">
+                    Publish STOP
+                </button>
+            </div>
+
+            <hr />
+
+            <h6>Received MQTT Sensor Data</h6>
+
+            <p>
+                <strong>Temperature:</strong>
+                @(Mqtt.HasReceivedData
+                    ? $"{Mqtt.Temperature:F1} °C"
+                    : "NO DATA")
+            </p>
+
+            <p>
+                <strong>PNP Sensor:</strong>
+                @(Mqtt.HasReceivedData
+                    ? (Mqtt.SensorDetected ? "DETECTED" : "NOT DETECTED")
+                    : "NO DATA")
+            </p>
+
+            <p>
+                <strong>Run Enable:</strong>
+                @(Mqtt.HasReceivedData
+                    ? Mqtt.RunEnable.ToString()
+                    : "NO DATA")
+            </p>
+
+            <p>
+                <strong>Data Freshness:</strong>
+                @(HasLiveData ? "FRESH" : "UNAVAILABLE / STALE")
+            </p>
+
+            <p>
+                <strong>Last Update:</strong>
+                @(Mqtt.LastUpdated?.ToString("yyyy-MM-dd HH:mm:ss")
+                    ?? "NO DATA")
+            </p>
+
+            <p>
+                <strong>Device Status:</strong>
+                @Mqtt.DeviceStatus
+            </p>
+
+            <p>
+                <strong>Last MQTT Message:</strong>
+                @Mqtt.LastMessage
+            </p>
+
+            <p>
+                <strong>Last Command:</strong>
+                @LastMqttCommand
+            </p>
+
+            @if (!Mqtt.HasReceivedData)
+            {
+                <div class="alert alert-warning">
+                    Waiting for MQTT telemetry.
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Mqtt.LastError))
+            {
+                <div class="alert alert-danger">
+                    MQTT Error: @Mqtt.LastError
+                </div>
+            }
+
+            <small class="text-muted">
+                MQTT publish confirms message transmission,
+                not physical execution by the WAGO controller.
+            </small>
+
+        </div>
+    </div>
+
+    <!-- MQTT COMMAND ACKNOWLEDGEMENT -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5>MQTT Command Acknowledgement</h5>
+
+            <p>
+                <strong>Last Command:</strong>
+                @Mqtt.LastCommand
+            </p>
+
+            <p>
+                <strong>Command ID:</strong>
+                <code>@Mqtt.LastCommandId</code>
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+
+                <span class="badge @(
+                      Mqtt.CommandState == "ACKNOWLEDGED"
+                          ? "bg-success"
+                          : Mqtt.CommandState == "TIMEOUT" ||
+                            Mqtt.CommandState == "PUBLISH FAILED"
+                              ? "bg-danger"
+                              : Mqtt.CommandState == "PENDING"
+                                  ? "bg-warning text-dark"
+                                  : "bg-secondary")">
+                    @Mqtt.CommandState
+                </span>
+            </p>
+
+            <p>
+                <strong>Details:</strong>
+                @Mqtt.CommandDetail
+            </p>
+
+            <p class="text-muted">
+                Acknowledgement timeout: 5 seconds.
+            </p>
+        </div>
+    </div>
+
+    <!-- SIMULATED SYSTEM FAULT DETECTION -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5>System Fault Detection</h5>
+
+            <span class="badge bg-warning text-dark mb-3">
+                SIMULATION ONLY
+            </span>
+
+            @if (HasFault)
+            {
+                <div class="alert alert-danger">
+                    <strong>SYSTEM FAULT DETECTED</strong>
+                    <div>@FaultReason</div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success">
+                    <strong>SIMULATED DEVICE ONLINE</strong>
+                    <div>
+                        No simulated communication fault detected.
+                    </div>
+                </div>
+            }
+
+            <div class="row g-3 mb-3">
+
+                <div class="col-md-4">
+                    <strong>Simulated Network:</strong>
+                    <div>
+                        @(NetworkAvailable ? "CONNECTED" : "DISCONNECTED")
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Simulated Heartbeat:</strong>
+                    <div>
+                        @(HeartbeatEnabled ? "ACTIVE" : "PAUSED")
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Last Heartbeat:</strong>
+                    <div>
+                        @LastHeartbeat.ToLocalTime().ToString("HH:mm:ss")
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-muted">
+                Heartbeat interval: 2 seconds.
+                Timeout limit: 6 seconds.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2">
+
+                <button class="btn btn-outline-warning"
+                        @onclick="ToggleHeartbeat">
+                    @(HeartbeatEnabled
+                        ? "Pause Heartbeat"
+                        : "Resume Heartbeat")
+                </button>
+
+                <button class="btn btn-outline-danger"
+                        @onclick="ToggleNetwork">
+                    @(NetworkAvailable
+                        ? "Simulate Network Loss"
+                        : "Restore Network")
+                </button>
+            </div>
+
+            <div class="alert alert-info mt-3 mb-0">
+                This panel simulates device faults.
+                It does not disconnect the real MQTT Broker.
+            </div>
+        </div>
+    </div>
+
+    <!-- NP9 PUSH BUTTON SIMULATION -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5>NP9 Push Button Control</h5>
+
+            <p class="text-muted">
+                Simulated momentary push button with toggle logic.
+            </p>
+
+            <button class="btn btn-primary btn-lg"
+                    disabled="@(UseMqttMode || HasFault)"
+                    @onclick="ToggleRun">
+                PRESS NP9 BUTTON
+            </button>
+
+            <p class="mt-3">
+                Simulated Run Enable:
+                <strong>@RunEnable</strong>
+            </p>
+
+            @if (UseMqttMode)
+            {
+                <small class="text-warning">
+                    Local simulation control is disabled in MQTT Mode.
+                    Use MQTT Publish buttons for remote commands.
+                </small>
+            }
+            else if (HasFault)
+            {
+                <small class="text-danger">
+                    Start is inhibited during a simulated fault.
+                </small>
+            }
+        </div>
+    </div>
+
+    <!-- SENSOR SIMULATION PANEL -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <h5>Sensor Simulation Panel</h5>
+
+            <div class="mb-3">
+                <label class="form-label">
+                    PNP Proximity Sensor
+                </label>
+
+                <div>
+                    <button class="btn btn-outline-primary"
+                            disabled="@UseMqttMode"
+                            @onclick="ToggleSensor">
+                        Toggle Detection
+                    </button>
+                </div>
+
+                <p class="mt-2">
+                    Sensor Status:
+                    <strong>
+                        @(SensorDetected ? "DETECTED" : "NOT DETECTED")
+                    </strong>
+                </p>
+            </div>
+
+            <label class="form-label">
+                Simulated Temperature:
+                @Temperature.ToString("F1") °C
+            </label>
+
+            <input type="range"
+                   class="form-range"
+                   min="0"
+                   max="80"
+                   step="0.5"
+                   disabled="@UseMqttMode"
+                   @bind="Temperature"
+                   @bind:event="oninput"
+                   @bind:after="CheckTemperatureAlarm" />
+        </div>
+    </div>
+
+    <!-- EVENT HISTORY -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    Event History & Alarm Log
+                </h5>
+
+                <button class="btn btn-outline-secondary btn-sm"
+                        @onclick="ClearHistory">
+                    Clear History
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Event Type</th>
+                            <th>Description</th>
+                            <th>Severity</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @if (EventHistory.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center">
+                                    No events recorded.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in EventHistory)
+                            {
+                                <tr>
+                                    <td>
+                                        @item.Timestamp.ToString(
+                                            "yyyy-MM-dd HH:mm:ss")
+                                    </td>
+                                    <td>@item.Type</td>
+                                    <td>@item.Description</td>
+                                    <td>
+                                        <span class="@GetSeverityClass(item.Severity)">
+                                            @item.Severity
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <small class="text-muted">
+                Latest 100 events are stored in memory.
+                Logs are cleared when the page instance is restarted.
+            </small>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    // ==================================================
+    // SIMULATION VARIABLES
+    // ==================================================
+
+    private bool RunEnable = false;
+    private bool SensorDetected = false;
+
+    private double Temperature = 25.0;
+    private double Threshold = 40.0;
+    private double DraftThreshold = 40.0;
+
+    // ==================================================
+    // MQTT MONITORING VARIABLES
+    // ==================================================
+
+    private bool UseMqttMode = false;
+    private string LastMqttCommand = "None";
+
+    private bool HasLiveData =>
+        Mqtt.IsConnected &&
+        Mqtt.HasReceivedData &&
+        Mqtt.LastUpdated.HasValue &&
+        DateTime.Now - Mqtt.LastUpdated.Value
+            <= TimeSpan.FromSeconds(30);
+
+    private bool DataAvailable =>
+        !UseMqttMode || HasLiveData;
+
+    private bool DisplayRun =>
+        UseMqttMode ? Mqtt.RunEnable : RunEnable;
+
+    private bool DisplaySensor =>
+        UseMqttMode ? Mqtt.SensorDetected : SensorDetected;
+
+    private double DisplayTemperature =>
+        UseMqttMode ? Mqtt.Temperature : Temperature;
+
+    private bool DisplayAlarm =>
+        DataAvailable &&
+        DisplayTemperature >= Threshold;
+
+    private bool AlarmActive = false;
+
+    // ==================================================
+    // FAULT SIMULATION VARIABLES
+    // ==================================================
+
+    private bool NetworkAvailable = true;
+    private bool HeartbeatEnabled = true;
+
+    private DateTime LastHeartbeat = DateTime.UtcNow;
+    private string FaultReason = "";
+
+    private bool HasFault =>
+        !string.IsNullOrEmpty(FaultReason);
+
+    private readonly CancellationTokenSource
+        MonitorCancellation = new();
+
+    private Task? MonitorTask;
+
+    // ==================================================
+    // EVENT HISTORY MODEL
+    // ==================================================
+
+    private readonly List<SystemEvent> EventHistory = new();
+
+    private sealed class SystemEvent
+    {
+        public DateTime Timestamp { get; set; }
+        public string Type { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Severity { get; set; } = "";
+    }
+
+    // ==================================================
+    // COMPONENT INITIALIZATION
+    // ==================================================
+
+    protected override void OnInitialized()
+    {
+        LastHeartbeat = DateTime.UtcNow;
+
+        Mqtt.DataChanged += OnMqttDataChanged;
+        Mqtt.CommandEvent += OnCommandEvent;
+
+        AddEvent(
+            "System",
+            "Industrial Dashboard started.");
+
+        MonitorTask = MonitorAsync(
+            MonitorCancellation.Token);
+    }
+
+    // ==================================================
+    // MQTT CONNECTION
+    // ==================================================
+
+    private async Task ConnectMqtt()
+    {
+        await Mqtt.ConnectAsync();
+
+        AddEvent(
+            "MQTT Connection",
+            Mqtt.IsConnected
+                ? "Connected to local Mosquitto Broker."
+                : $"MQTT connection failed: {Mqtt.LastError}",
+            Mqtt.IsConnected ? "INFO" : "WARNING");
+    }
+
+    private async Task PublishStart()
+    {
+        await SendMqttCommand("START");
+    }
+
+    private async Task PublishStop()
+    {
+        await SendMqttCommand("STOP");
+    }
+
+    private async Task SendMqttCommand(string command)
+    {
+        try
+        {
+            await Mqtt.PublishCommandAsync(command);
+
+            LastMqttCommand =
+                $"{command} sent. ID: {Mqtt.LastCommandId}";
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            LastMqttCommand = $"FAILED: {ex.Message}";
+
+            AddEvent(
+                "MQTT Command",
+                ex.Message,
+                "WARNING");
+        }
+    }
+
+    private void OnMqttDataChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            if (UseMqttMode)
+            {
+                CheckTemperatureAlarm();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private void OnCommandEvent(
+        string severity,
+        string description)
+    {
+        _ = InvokeAsync(() =>
+        {
+            AddEvent(
+                "MQTT Command",
+                description,
+                severity);
+
+            StateHasChanged();
+        });
+    }
+
+    // ==================================================
+    // DATA SOURCE SELECTION
+    // ==================================================
+
+    private void SelectSimulationMode()
+    {
+        ChangeDataMode(false);
+    }
+
+    private void SelectMqttMode()
+    {
+        ChangeDataMode(true);
+    }
+
+    private void ChangeDataMode(bool useMqtt)
+    {
+        if (UseMqttMode == useMqtt)
+            return;
+
+        UseMqttMode = useMqtt;
+
+        // Establish a new alarm baseline.
+        // A source change is not a temperature recovery.
+        AlarmActive =
+            DataAvailable &&
+            DisplayTemperature >= Threshold;
+
+        AddEvent(
+            "Data Source",
+            UseMqttMode
+                ? "MQTT Monitoring Mode selected."
+                : "Simulation Mode selected.");
+
+        if (UseMqttMode && !HasLiveData)
+        {
+            AddEvent(
+                "MQTT Monitoring",
+                "Fresh MQTT telemetry is unavailable.",
+                "WARNING");
+        }
+    }
+
+    // ==================================================
+    // TEMPERATURE THRESHOLD AND ALARM
+    // ==================================================
+
+    private void ApplyThreshold()
+    {
+        if (Math.Abs(Threshold - DraftThreshold) < 0.001)
+            return;
+
+        Threshold = DraftThreshold;
+
+        AddEvent(
+            "Configuration",
+            $"Temperature threshold applied: {Threshold:F1} °C.");
+
+        CheckTemperatureAlarm();
+    }
+
+    private void CheckTemperatureAlarm()
+    {
+        if (!DataAvailable)
+            return;
+
+        bool newState =
+            DisplayTemperature >= Threshold;
+
+        if (newState == AlarmActive)
+            return;
+
+        AlarmActive = newState;
+
+        string source =
+            UseMqttMode ? "MQTT" : "Simulation";
+
+        if (AlarmActive)
+        {
+            AddEvent(
+                "Temperature Alarm",
+                $"[{source}] Temperature " +
+                $"{DisplayTemperature:F1} °C reached " +
+                $"threshold {Threshold:F1} °C.",
+                "ALARM");
+        }
+        else
+        {
+            AddEvent(
+                "Alarm Recovery",
+                $"[{source}] Temperature " +
+                $"{DisplayTemperature:F1} °C is now below " +
+                $"threshold {Threshold:F1} °C.",
+                "RECOVERY");
+        }
+    }
+
+    // ==================================================
+    // NP9 AND PNP SIMULATION
+    // ==================================================
+
+    private void ToggleRun()
+    {
+        if (UseMqttMode || HasFault)
+            return;
+
+        RunEnable = !RunEnable;
+
+        AddEvent(
+            "NP9 Push Button",
+            RunEnable
+                ? "Simulated system START command."
+                : "Simulated system STOP command.");
+    }
+
+    private void ToggleSensor()
+    {
+        if (UseMqttMode)
+            return;
+
+        SensorDetected = !SensorDetected;
+
+        AddEvent(
+            "PNP Sensor",
+            SensorDetected
+                ? "Object detected."
+                : "Object no longer detected.");
+    }
+
+    // ==================================================
+    // HEARTBEAT MONITORING LOOP
+    // ==================================================
+
+    private async Task MonitorAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer =
+                new PeriodicTimer(TimeSpan.FromSeconds(1));
+
+            while (await timer.WaitForNextTickAsync(
+                cancellationToken))
+            {
+                await InvokeAsync(() =>
+                {
+                    if (NetworkAvailable &&
+                        HeartbeatEnabled &&
+                        DateTime.UtcNow - LastHeartbeat >=
+                        TimeSpan.FromSeconds(2))
+                    {
+                        LastHeartbeat = DateTime.UtcNow;
+                    }
+
+                    EvaluateFault();
+
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal component shutdown.
+        }
+    }
+
+    // ==================================================
+    // SIMULATED FAULT DETECTION
+    // ==================================================
+
+    private void EvaluateFault()
+    {
+        string newReason = "";
+
+        if (!NetworkAvailable)
+        {
+            newReason = "NETWORK CONNECTION LOST";
+        }
+        else if (DateTime.UtcNow - LastHeartbeat >
+                 TimeSpan.FromSeconds(6))
+        {
+            newReason = "SENSOR HEARTBEAT TIMEOUT";
+        }
+
+        if (newReason == FaultReason)
+            return;
+
+        string previousReason = FaultReason;
+        FaultReason = newReason;
+
+        if (HasFault)
+        {
+            AddEvent(
+                "System Fault",
+                FaultReason,
+                "ALARM");
+
+            if (RunEnable)
+            {
+                RunEnable = false;
+
+                AddEvent(
+                    "Control",
+                    "Simulated Run Enable disabled by fault.",
+                    "WARNING");
+            }
+        }
+        else if (!string.IsNullOrEmpty(previousReason))
+        {
+            AddEvent(
+                "Fault Recovery",
+                "Simulated device communication restored.",
+                "RECOVERY");
+        }
+    }
+
+    private void ToggleHeartbeat()
+    {
+        HeartbeatEnabled = !HeartbeatEnabled;
+
+        if (HeartbeatEnabled && NetworkAvailable)
+        {
+            LastHeartbeat = DateTime.UtcNow;
+        }
+
+        AddEvent(
+            "Heartbeat Control",
+            HeartbeatEnabled
+                ? "Simulated heartbeat resumed."
+                : "Simulated heartbeat paused.");
+
+        EvaluateFault();
+    }
+
+    private void ToggleNetwork()
+    {
+        NetworkAvailable = !NetworkAvailable;
+
+        if (NetworkAvailable && HeartbeatEnabled)
+        {
+            LastHeartbeat = DateTime.UtcNow;
+        }
+
+        AddEvent(
+            "Network Simulation",
+            NetworkAvailable
+                ? "Simulated network restored."
+                : "Simulated network disconnected.");
+
+        EvaluateFault();
+    }
+
+    // ==================================================
+    // EVENT HISTORY
+    // ==================================================
+
+    private void AddEvent(
+        string type,
+        string description,
+        string severity = "INFO")
+    {
+        EventHistory.Insert(0, new SystemEvent
+        {
+            Timestamp = DateTime.Now,
+            Type = type,
+            Description = description,
+            Severity = severity
+        });
+
+        if (EventHistory.Count > 100)
+        {
+            EventHistory.RemoveAt(
+                EventHistory.Count - 1);
+        }
+    }
+
+    private string GetSeverityClass(string severity)
+    {
+        return severity switch
+        {
+            "ALARM" => "badge bg-danger",
+            "WARNING" => "badge bg-warning text-dark",
+            "RECOVERY" => "badge bg-success",
+            _ => "badge bg-secondary"
+        };
+    }
+
+    private void ClearHistory()
+    {
+        EventHistory.Clear();
+    }
+
+    // ==================================================
+    // COMPONENT CLEANUP
+    // ==================================================
+
+    public async ValueTask DisposeAsync()
+    {
+        Mqtt.DataChanged -= OnMqttDataChanged;
+        Mqtt.CommandEvent -= OnCommandEvent;
+
+        await MonitorCancellation.CancelAsync();
+
+        if (MonitorTask != null)
+        {
+            try
+            {
+                await MonitorTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown.
+            }
+        }
+
+        MonitorCancellation.Dispose();
+    }
+}

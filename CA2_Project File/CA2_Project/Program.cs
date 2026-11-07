@@ -1,6 +1,8 @@
 using CA2_Project.Components;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<
+    CA2_Project.Services.MqttDashboardService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
