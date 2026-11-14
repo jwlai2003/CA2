@@ -60,8 +60,3 @@ IIoT and MQTT communication in a monitoring system.
 
 It provides practical experience in developing
 a dashboard and implementing command acknowledgement.
-
----
-
-**CA2 Project | Industrial Internet of Things (IIoT)**
-  
