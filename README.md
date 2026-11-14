@@ -1,136 +1,427 @@
+
 # Industrial IIoT Monitoring Dashboard
 
 ### Smart Conveyor Weight Monitoring and Overload Detection System
 
-**TMS202/04 — IoT Sensing Devices and Interfaces | CA2 Project**
+**TMS202/04 – IoT Sensing Devices and Interfaces | CA2 Project**
 
-An educational Industrial Internet of Things (IIoT) prototype built with **WAGO Compact Controller 100 (751-9301), CODESYS, MQTT, Beaver IoT, C# .NET 10, and Blazor**.
+An Industrial Internet of Things (IIoT) monitoring and control application developed using **WAGO Compact Controller 100 (751-9301), CODESYS, MQTT, Beaver IoT, C# .NET 10 and Blazor**.
 
-> **Project scope:** The conveyor is visualised in software, and product weight is an engineering simulation derived from input voltage (weight in kg = voltage / 10). No calibrated load cell or physical conveyor motor is controlled by the dashboard.
+---
 
 ## 1. Introduction
 
-This project demonstrates an IIoT approach to monitoring a smart conveyor's sensing, operation and overload conditions. The WAGO CC100 processes industrial inputs, publishes telemetry to an MQTT broker, and receives remote START/STOP requests. A C# Blazor dashboard subscribes to telemetry, displays PNP detection and voltage-derived weight, and provides operating status, alarms, fault indications and event history.
+This project focuses on the development of an Industrial Internet of Things (IIoT) monitoring and control system for a smart conveyor application. The system integrates industrial sensing devices, a programmable logic controller (PLC), MQTT communication and a web-based dashboard to support real-time monitoring, remote control, overload detection and fault monitoring.
 
-A standalone **Simulation Mode** demonstrates NP9 push-button actions, PNP detection, weight changes, conveyor animation and communication faults without a physical PLC connection.
+The WAGO Compact Controller 100 (751-9301) serves as the industrial edge controller, collecting sensor information and processing control logic through CODESYS. Sensor data is transmitted through an MQTT broker integrated with Beaver IoT and visualised using a C# .NET Blazor dashboard.
 
-**Dashboard showcase:** A screenshot of the running dashboard will be added once the project image assets are uploaded.
+The application includes PNP sensor monitoring, simulated product weight measurement, configurable overload detection, conveyor visualisation, MQTT-based START/STOP commands and event logging.
 
-<!-- After uploading an actual screenshot to docs/images/dashboard-overview.png:
-![Industrial IIoT dashboard overview](docs/images/dashboard-overview.png)
--->
+A standalone Simulation Mode is also provided to demonstrate system operation, network faults, heartbeat timeout detection and recovery without requiring continuous access to the physical WAGO PLC.
 
 ## 2. Project Objectives
 
-- Integrate PLC sensing and control with MQTT-based IIoT communication.
-- Display live input measurements, PNP status and PLC run state.
-- Demonstrate both **MQTT Subscribe** (telemetry) and **MQTT Publish** (START/STOP commands).
-- Apply a configurable weight threshold and show overweight alerts.
-- Provide a conveyor visualisation and standalone software simulation.
-- Detect missing telemetry and demonstrate network-fault/heartbeat-timeout recovery.
-- Maintain timestamped system events, alarms and diagnostic information.
+The main objectives of this project are:
+
+- Develop an IIoT monitoring and control system integrating industrial sensors, PLC programming and MQTT communication.
+- Display real-time sensor readings and operating conditions through an interactive web-based dashboard.
+- Implement MQTT Subscribe and Publish for bidirectional communication between the PLC and the dashboard.
+- Provide configurable weight thresholds and automatic overweight alerts.
+- Simulate conveyor operation, product detection and weight inspection.
+- Implement communication fault detection using telemetry monitoring and heartbeat mechanisms.
+- Record system events, alarm conditions and recovery activities.
+- Validate system behaviour through functional testing and software-based fault simulations.
 
 ## 3. System Architecture
 
+The IIoT system consists of industrial sensing devices, a WAGO PLC, an MQTT broker and a C# .NET Blazor web application.
+
 ```mermaid
 flowchart TD
-    S["PNP sensor / NP9 input / adjustable voltage"] --> P["WAGO CC100 PLC<br/>CODESYS control logic"]
-    P -->|Publish sensor telemetry| B["MQTT Broker<br/>Beaver IoT integration"]
-    B -->|Subscribe telemetry| D["C# .NET Blazor Dashboard"]
-    D -->|Publish START / STOP| B
-    B -->|Deliver commands| P
-    P -->|Publish command response| B
-    D -.-> SIM["Standalone Software Simulation<br/>Weight, conveyor, network fault, heartbeat"]
+    A["Industrial Sensors<br/>PNP / NP9 / Voltage Input"]
+    B["WAGO CC100 PLC<br/>CODESYS"]
+    C["MQTT Broker<br/>Beaver IoT"]
+    D["C# .NET Blazor Dashboard"]
+    E["Monitoring and Control<br/>Visualisation / Alerts / Commands"]
+    F["Software Simulation<br/>Conveyor / Network Fault / Heartbeat"]
+
+    A --> B
+    B -->|"Publish Telemetry"| C
+    C -->|"MQTT Subscribe"| D
+    D -->|"MQTT Publish Commands"| C
+    C -->|"Deliver START / STOP"| B
+    B -->|"Command Acknowledgement"| C
+    D --> E
+    D -.-> F
 ```
 
-**Data flow:** The PLC generates measurement and status data; the broker exchanges MQTT messages; and the Blazor web application presents operator-facing monitoring and control. Command execution is confirmed only when the application receives a matching device acknowledgement.
+### 3.1 Industrial Hardware
 
-**Main components:** WAGO CC100 (751-9301), PNP proximity sensor, NP9 push button, associated industrial power and communication hardware, CODESYS, Beaver IoT MQTT integration and the Blazor web dashboard.
+The hardware platform includes:
+
+- WAGO Compact Controller 100 (751-9301)
+- 24V DIN-Rail Power Supply
+- PNP Proximity Sensor
+- NP9 Push Button
+- LED Indicator
+- Industrial communication and terminal modules
+- Ethernet networking equipment
+
+### 3.2 PLC Programming
+
+CODESYS is used to implement sensor processing, operating logic, MQTT communication and the internal RunEnable control state.
+
+### 3.3 MQTT Communication
+
+The MQTT broker provides a communication interface between the WAGO PLC and the Blazor dashboard.
+
+The PLC publishes sensor telemetry, while the web application subscribes to incoming measurements and publishes remote control commands.
+
+### 3.4 Web Application
+
+The Blazor dashboard provides real-time monitoring, configurable alarms, remote control, conveyor visualisation, communication diagnostics and event history.
 
 ## 4. Key Features
 
-| Feature | Description |
+### 4.1 Real-Time Sensor Monitoring
+
+The dashboard monitors and displays:
+
+- PNP proximity sensor detection status
+- Voltage measurements
+- Voltage-derived simulated product weight
+- PLC RunEnable state
+- Device communication status
+- MQTT telemetry freshness
+- Physical input event counters, where available
+
+The system updates the displayed measurements according to the incoming MQTT telemetry.
+
+### 4.2 Weight Monitoring and Overload Detection
+
+The application converts the received voltage value into a simulated engineering weight using:
+
+**Weight (kg) = Voltage / 10**
+
+A configurable weight threshold allows the operator to define the maximum permitted product weight.
+
+The dashboard displays:
+
+- NORMAL when the weight is within the configured limit.
+- OVERWEIGHT when the weight exceeds the configured limit.
+- NO DATA when valid monitoring information is unavailable.
+
+Overweight conditions and recovery events are recorded in the Event History.
+
+**Note:** The weight value is an engineering simulation. No calibrated physical load cell is connected.
+
+### 4.3 MQTT Subscribe and Publish
+
+The application supports bidirectional MQTT communication.
+
+**MQTT Subscribe**
+
+The dashboard receives telemetry data published by the WAGO controller, including sensor status, voltage measurements and internal operating information.
+
+**MQTT Publish**
+
+The dashboard can publish remote START and STOP commands through the MQTT broker.
+
+Each command includes a unique Command ID to support acknowledgement tracking.
+
+The application monitors command states such as:
+
+- PENDING
+- ACKNOWLEDGED
+- TIMEOUT
+- PUBLISH FAILED
+
+A matching acknowledgement is required to confirm that the command has been processed by the connected device.
+
+Remote START/STOP changes the PLC's internal RunEnable test state and does not operate a physical conveyor motor.
+
+### 4.4 Conveyor Visualisation
+
+The dashboard includes an animated conveyor visualisation to demonstrate product movement and inspection.
+
+The visualisation represents:
+
+- Conveyor RUNNING and STOPPED conditions
+- Product approach and detection
+- PNP sensor activation
+- Product weight inspection
+- PASS and REJECT conditions
+- Communication unavailable conditions
+
+This feature provides a visual demonstration of the monitoring and inspection process.
+
+### 4.5 Network Fault Detection
+
+The application includes a Network Fault Simulation function.
+
+When a simulated communication failure is activated:
+
+- System Status displays COMMUNICATION LOST.
+- Device Health displays SIMULATED PLC OFFLINE.
+- Sensor readings become unavailable.
+- The conveyor visualisation stops.
+- Weight alarm evaluation is suspended.
+- A fault event is recorded in Event History.
+
+The function demonstrates how the dashboard responds when monitoring information becomes unavailable.
+
+### 4.6 Heartbeat Monitoring
+
+The Simulation Mode includes a heartbeat monitoring mechanism to detect missing communication updates.
+
+**Heartbeat Configuration**
+
+| Parameter | Setting |
 |---|---|
-| Real-time sensor monitoring | PNP detection, PLC run state, voltage and telemetry freshness |
-| Weight threshold alert | Adjustable limit and overweight indication using simulated engineering weight |
-| MQTT two-way messaging | Telemetry subscription and START/STOP command publication |
-| Command acknowledgement | Command IDs, pending state and acknowledgement timeout |
-| Conveyor visualisation | Animated demonstration of product movement and inspection outcomes |
-| Simulation Mode | Local NP9, PNP and weight controls without a PLC |
-| Fault detection | Live-telemetry freshness checks and simulated network-fault/heartbeat-timeout warnings |
-| Event history | Timestamped status changes, alarms and recovery notifications |
+| Heartbeat Interval | 2 seconds |
+| Timeout Threshold | 6 seconds |
+| Fault Indication | HEARTBEAT TIMEOUT |
+| Recovery Indication | HEARTBEAT ACTIVE |
+
+During normal simulated operation, heartbeat updates are generated periodically.
+
+When heartbeat updates stop for more than six seconds, the dashboard triggers a timeout warning and records the event.
+
+The timeout is calculated from the last successful heartbeat update.
+
+### 4.7 Event History and Alarm Logging
+
+The dashboard maintains a timestamped Event History for important operating events.
+
+Recorded events include:
+
+- System initialisation
+- Simulation Mode activation
+- NP9 button operation
+- PNP sensor changes
+- Weight alarms and recovery
+- MQTT connection changes
+- Network faults
+- Heartbeat timeouts
+- Communication recovery
+- Remote command acknowledgement and timeout
+
+These records support troubleshooting and analysis of system behaviour.
 
 ## 5. Technologies Used
 
-| Technology | Role |
+| Technology | Purpose |
 |---|---|
 | WAGO CC100 (751-9301) | Industrial edge controller |
-| CODESYS | PLC input handling and control logic |
-| MQTT | Publish/subscribe communication |
-| Beaver IoT | MQTT integration and device identification |
-| C# / .NET 10 | Application framework |
-| Blazor Server | Interactive browser dashboard |
-| MQTTnet | MQTT client library |
+| CODESYS | PLC programming and control logic |
+| MQTT | Publish/Subscribe communication protocol |
+| Beaver IoT | MQTT integration and device management |
+| C# | Application programming language |
+| .NET 10 | Web application framework |
+| Blazor Server | Interactive monitoring dashboard |
+| MQTTnet | MQTT client communication library |
+| HTML / CSS / Bootstrap | Dashboard interface and styling |
+| Visual Studio | Application development environment |
 
 ## 6. Operation Modes
 
-### WAGO MQTT Monitoring
+The application provides two operating modes.
 
-Receives telemetry from the real MQTT broker and displays the latest available PLC readings. It can publish START/STOP commands to the controller's **internal RunEnable test state**, not a physical conveyor motor.
+### 6.1 WAGO MQTT Monitoring Mode
 
-### Simulation Mode
+WAGO MQTT Monitoring Mode receives telemetry data from the physical WAGO controller through the MQTT broker.
 
-Simulates PNP detection, NP9 interaction and voltage-equivalent weight monitoring locally. It also supports a software-only **Simulate Network Loss** test: simulated data becomes unavailable, the conveyor visualisation stops, and the simulated heartbeat times out. **Restore Network** resumes simulated communication and logs recovery.
+The dashboard displays:
 
-> The real broker connection shown in the MQTT panel is separate from the simulated PLC communication status; a simulation fault does not physically disconnect MQTT.
+- Live PNP sensor status
+- Voltage measurements
+- Simulated weight calculated from voltage
+- PLC internal operating state
+- Telemetry freshness
+- MQTT connection status
+
+Remote START and STOP commands can also be published through MQTT.
+
+The weight input slider is disabled in this mode because the displayed weight depends on the incoming PLC measurement.
+
+### 6.2 Simulation Mode
+
+Simulation Mode allows the application to operate without connecting to the physical WAGO PLC.
+
+Available simulation functions include:
+
+- Manual weight adjustment
+- NP9 push-button simulation
+- PNP sensor detection simulation
+- Conveyor operation visualisation
+- Overweight threshold testing
+- Network fault simulation
+- Heartbeat pause and resume
+- Communication recovery
+
+Simulation Mode is useful for demonstrating system behaviour, testing dashboard functions and validating alarm indications.
 
 ## 7. Testing and Validation
 
-Recommended demonstration sequence:
+Functional testing was carried out to evaluate the dashboard's software simulation features, communication fault detection and recovery behaviour.
 
-1. Confirm normal dashboard monitoring and simulated conveyor operation.
-2. Move the weight control above the configured threshold to verify the overweight alert.
-3. In Simulation Mode, select **Simulate Network Loss** and observe **COMMUNICATION LOST**, **SIMULATED PLC OFFLINE**, and **NO DATA**.
-4. Verify that missing simulated heartbeat updates cause **HEARTBEAT TIMEOUT** after the six-second threshold measured from the last heartbeat.
-5. Select **Restore Network**, confirm recovery, and review timestamped entries in **Event History**.
-6. Where hardware is available, separately test MQTT telemetry, START/STOP publication and matching acknowledgement.
+### 7.1 Software Simulation Test Results
 
-**Evidence gallery:** Add project screenshots to `docs/images/` and enable the examples below when the files exist:
+| Test Case | Observed Result | Status |
+|---|---|---|
+| Network Fault Detection | COMMUNICATION LOST displayed | PASS |
+| Device Health Monitoring | SIMULATED PLC OFFLINE displayed | PASS |
+| Sensor Data Availability | PNP and weight readings changed to NO DATA | PASS |
+| Heartbeat Timeout | HEARTBEAT TIMEOUT warning triggered | PASS |
+| Conveyor Fault Response | Conveyor stopped and displayed COMMUNICATION UNAVAILABLE | PASS |
+| Fault Event Logging | Network fault and heartbeat timeout recorded | PASS |
+| Network Recovery | Network status returned to NORMAL | PASS |
+| Heartbeat Recovery | Heartbeat returned to ACTIVE | PASS |
+| Conveyor Recovery | Simulated conveyor operation resumed | PASS |
 
-<!--
-### Dashboard — Normal Operation
-![Normal dashboard operation](docs/images/dashboard-overview.png)
+### 7.2 Network Fault Demonstration
 
-### Network Fault Detection
-![Network fault detection](docs/images/network-fault.png)
+The network fault simulation was performed using the Simulate Network Loss function.
 
-### Heartbeat Timeout and Event History
-![Heartbeat timeout and event history](docs/images/heartbeat-timeout.png)
+The dashboard immediately detected the simulated fault and displayed COMMUNICATION LOST and SIMULATED PLC OFFLINE.
 
-### Network Recovery
-![Network recovery](docs/images/network-recovery.png)
--->
+Sensor data became unavailable, and the conveyor visualisation stopped.
 
-**Validation boundary:** Simulation tests show the web application's responses to injected faults. They do **not** prove real PLC power-loss, sensor-disconnection or Ethernet-cable-failure detection.
+The heartbeat mechanism subsequently detected missing updates and generated a HEARTBEAT TIMEOUT warning.
+
+### 7.3 Event Logging Verification
+
+The Event History recorded the following test events:
+
+| Event | Recorded Time |
+|---|---|
+| Network Fault | 18:14:03 |
+| Heartbeat Timeout | 18:14:08 |
+
+The observed time difference was approximately five seconds.
+
+This is consistent with the heartbeat timeout being calculated from the last successful heartbeat rather than from the moment the network fault was activated.
+
+### 7.4 System Recovery
+
+After selecting Restore Network, the dashboard returned to its normal simulated communication state.
+
+The following recovery conditions were observed:
+
+- Network Status: NORMAL
+- Heartbeat Status: HEARTBEAT ACTIVE
+- Simulated sensor data available
+- Conveyor visualisation resumed
+- Recovery events recorded in Event History
+
+### 7.5 Testing Limitations
+
+These results validate the application-level software simulation.
+
+The simulated network fault does not physically disconnect the MQTT broker or WAGO controller.
+
+Actual PLC power loss, Ethernet cable disconnection and physical sensor failures require separate hardware-based testing.
 
 ## 8. Security Considerations
 
-Beaver IoT MQTT integration uses configured credentials. Do not commit MQTT passwords, tokens, certificates or secret environment variables to this repository. For a production network, consider TLS, broker topic-level permissions, restricted network access and appropriate PLC/hardware safety mechanisms.
+Security is important in IIoT systems because unauthorised access may compromise sensor information or allow unintended control commands.
 
-## 9. Running the Project
+The MQTT integration uses configured username and password credentials.
 
-1. Install the **.NET 10 SDK** and open the solution in Visual Studio.
-2. Open `CA2_Project File.slnx` or the nested project solution.
-3. Restore NuGet dependencies (the project uses MQTTnet).
-4. Run the Blazor application and browse to **`/industrial-dashboard`**.
-5. Choose **Simulation Mode** to explore local features without PLC hardware.
-6. For live monitoring, configure a reachable MQTT broker and set the required `BEAVER_MQTT_PASSWORD` environment variable; select **WAGO MQTT Monitoring** and connect.
+Device identification is also used to associate incoming telemetry with the intended device.
 
-**Configuration note:** Broker address, credentials and topics in the checked-in application may be specific to the development environment. Verify settings locally before testing live MQTT; avoid publishing credentials.
+However, device identification alone does not provide authentication or access control.
+
+### Recommended Security Improvements
+
+- MQTT communication over TLS
+- Topic-level access permissions
+- Network segmentation
+- Secure credential management
+- Restricted remote control access
+- Periodic security configuration reviews
+
+MQTT passwords, authentication tokens and other sensitive credentials should not be committed to the GitHub repository.
+
+## 9. Installation and Setup
+
+### 9.1 Prerequisites
+
+Before running the project, ensure the following software is available:
+
+- Visual Studio with ASP.NET and web development support
+- .NET 10 SDK
+- MQTTnet NuGet package
+- A compatible MQTT broker for live monitoring
+- WAGO CC100 and CODESYS for physical PLC integration
+
+Simulation Mode does not require a physical PLC connection.
+
+### 9.2 Running the Application
+
+1. Clone or download this GitHub repository.
+2. Open the project solution in Visual Studio.
+3. Restore the required NuGet packages.
+4. Build the solution.
+5. Run the Blazor web application.
+6. Open `/industrial-dashboard` in the browser.
+7. Select Simulation Mode or WAGO MQTT Monitoring.
+
+### 9.3 Simulation Mode Setup
+
+1. Select Simulation Mode.
+2. Adjust the simulated weight using the slider.
+3. Press the NP9 simulation button to change the running state.
+4. Toggle the PNP sensor to simulate object detection.
+5. Observe the conveyor visualisation.
+6. Trigger Network Fault to demonstrate communication failure.
+7. Observe the heartbeat timeout warning.
+8. Select Restore Network to resume simulated communication.
+
+### 9.4 WAGO MQTT Monitoring Setup
+
+1. Ensure the WAGO controller and MQTT broker are correctly configured.
+2. Verify the broker address and MQTT topic settings.
+3. Configure the required MQTT authentication credentials securely.
+4. Start the Blazor application.
+5. Select WAGO MQTT Monitoring.
+6. Connect to the MQTT broker.
+7. Verify that telemetry is received.
+8. Test remote control commands only when the intended PLC test logic is ready.
+
+The application uses the `BEAVER_MQTT_PASSWORD` environment variable for the MQTT password.
+
+Do not store real passwords directly in public source code.
 
 ## 10. Project Scope and Limitations
 
-This is an educational IIoT prototype. The weight calculation is not a calibrated measurement, and conveyor movement is animated. A simulated network fault is not equivalent to a disconnected real PLC. Physical actuator safety, accurate sensing and industrial deployment require separate hardware verification, interlocks and commissioning.
+This project is an educational IIoT prototype developed to demonstrate industrial sensor integration, MQTT communication, monitoring and software-based fault detection.
+
+The system has several limitations:
+
+- Product weight is calculated from an adjustable voltage value rather than a calibrated load cell.
+- The conveyor animation represents a simulated process.
+- Remote START and STOP commands control the PLC's internal test state rather than a physical conveyor motor.
+- Network fault simulation does not physically interrupt the MQTT broker connection.
+- The simulated heartbeat does not represent an independently transmitted physical PLC heartbeat.
+- Physical equipment safety and actual industrial deployment require additional hardware validation.
+
+These limitations provide opportunities for future improvements and further development.
+
+## 11. Conclusion
+
+The Industrial IIoT Monitoring Dashboard demonstrates the integration of industrial sensing, PLC programming, MQTT communication and web-based monitoring within a smart conveyor application.
+
+The system provides sensor visualisation, configurable overweight detection, MQTT-based remote commands, conveyor simulation, communication fault indication and event logging.
+
+Software simulation testing demonstrated that the dashboard can identify simulated network failures, detect heartbeat timeouts, indicate unavailable monitoring data and restore normal operation after recovery.
+
+The project provides a foundation for further development of reliable IIoT monitoring and control applications, including physical sensor integration, enhanced cybersecurity and hardware-based failure detection.
 
 ---
-**Project:** TMS202/04 — Industrial IIoT Monitoring Dashboard
+
+**TMS202/04 – IoT Sensing Devices and Interfaces**
+
+**Project: Smart Conveyor Weight Monitoring and Overload Detection System**
+
+**Platform: WAGO CC100 | CODESYS | MQTT | Beaver IoT | C# .NET Blazor**
