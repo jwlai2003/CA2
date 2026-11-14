@@ -39,7 +39,7 @@
                     @if (ShowWeightOnProduct)
                     {
                         <span class="cv-product-weight">
-                            @WeightKg.ToString("F2") kg
+                            @ProductWeight.ToString("F2") kg
                         </span>
                     }
                     else
@@ -124,8 +124,9 @@
     </div>
 
     <div class="cv-note">
-        Educational conveyor visualization. Product position and inspection pause
-        are simulated; PLC RunEnable and overweight protection remain unchanged.
+        Product motion is illustrative. An overweight product completes its visual
+        approach before stopping at the sensor. PLC protection acts independently;
+        the PLC status shown above remains live.
     </div>
 </div>
 
@@ -152,11 +153,15 @@
 
     private InspectionPhase _phase = InspectionPhase.Offline;
     private double _elapsed;
+    private bool _rejectPending;
+    private double _rejectedWeight;
+    private double _rejectedLimit;
+    private double ProductWeight =>
+        _phase == InspectionPhase.Rejected ? _rejectedWeight : WeightKg;
     private readonly CancellationTokenSource _cts = new();
 
     private const double ApproachSeconds = 3.0;
     private const double PassSeconds = 2.2;
-    private const double RejectSeconds = 1.6;
     private const double ClearanceSeconds = 0.5;
 
     private bool IsOverweight =>
@@ -176,12 +181,10 @@
             or InspectionPhase.Rejected;
 
     private bool BeltAnimated =>
-      HasData &&
-      IsRunning &&
-      !AlarmLatched &&
-      !IsOverweight &&
-      _phase != InspectionPhase.Rejected &&
-      _phase != InspectionPhase.Removed;
+        HasData &&
+        _phase != InspectionPhase.Rejected &&
+        _phase != InspectionPhase.Removed &&
+        (_rejectPending || (IsRunning && !AlarmLatched && !IsOverweight));
 
     private string ProductClass => _phase switch
     {
@@ -201,6 +204,9 @@
 
             if (_phase is InspectionPhase.Rejected or InspectionPhase.Removed)
                 return "REJECTED";
+
+            if (_rejectPending)
+                return "OVERWEIGHT - MOVING TO SENSOR";
 
             if (AlarmLatched)
                 return "ALARM LATCHED";
@@ -223,7 +229,7 @@
                 return "cv-status-offline";
 
             if (_phase is InspectionPhase.Rejected or InspectionPhase.Removed ||
-                AlarmLatched)
+                AlarmLatched || _rejectPending)
                 return "cv-status-reject";
 
             if (_phase == InspectionPhase.Passing)
@@ -245,7 +251,7 @@
         InspectionPhase.Passing => "NORMAL WEIGHT - PASS",
         InspectionPhase.Clearance => "PRODUCT PASSED INSPECTION",
         InspectionPhase.Rejected => "OVERWEIGHT - REJECT",
-        InspectionPhase.Removed => "PRODUCT REMOVED - WAITING FOR RESTART",
+        InspectionPhase.Removed => "WAITING FOR RESTART",
         _ => "STANDBY"
     };
 
@@ -270,7 +276,7 @@
             "Accepted product has left the inspection station.",
 
         InspectionPhase.Rejected =>
-            $"{WeightKg:F2} kg exceeds the {WeightLimitKg:F2} kg limit. Product rejected.",
+            $"Recorded weight {_rejectedWeight:F2} kg exceeded {_rejectedLimit:F2} kg. Remove the product and clear the overload.",
 
         InspectionPhase.Removed =>
             "Remove the detected product, restore normal weight, then restart the PLC.",
@@ -300,37 +306,35 @@
             return;
         }
 
-        // A detected overweight condition takes priority,
-        // even when PLC RunEnable has already changed to FALSE.
-        if (IsOverweight &&
+        // Record the event without jumping the product to the sensor.
+        if (IsOverweight && !_rejectPending &&
             _phase != InspectionPhase.Rejected &&
             _phase != InspectionPhase.Removed)
         {
-            SetPhase(InspectionPhase.Rejected);
-            return;
+            _rejectPending = true;
+            _rejectedWeight = WeightKg;
+            _rejectedLimit = WeightLimitKg;
         }
 
-        // Keep the local reject visualization until the product
-        // has been removed and the PLC is ready to restart.
+        // Hold the rejected product at the sensor until removal and clearance.
         if (_phase == InspectionPhase.Rejected)
         {
-            _elapsed += deltaSeconds;
-
-            if (_elapsed >= RejectSeconds)
+            if (!IsDetected && WeightKg <= WeightLimitKg)
                 SetPhase(InspectionPhase.Removed);
-
             return;
         }
 
         if (_phase == InspectionPhase.Removed)
         {
-            if (IsRunning && !IsDetected && !AlarmLatched)
+            if (IsRunning && !IsDetected && !AlarmLatched &&
+                WeightKg <= WeightLimitKg)
                 SetPhase(InspectionPhase.Approaching);
-
             return;
         }
 
-        if (!IsRunning || AlarmLatched)
+        // Finish only the illustrative motion for a recorded overweight event.
+        // This does not alter IsRunning, send commands, or delay PLC protection.
+        if (!_rejectPending && (!IsRunning || AlarmLatched))
         {
             SetPhase(InspectionPhase.Stopped);
             return;
@@ -347,14 +351,24 @@
         {
             case InspectionPhase.Approaching:
                 if (_elapsed >= ApproachSeconds)
-                    SetPhase(InspectionPhase.Passing);
+                {
+                    SetPhase(_rejectPending
+                        ? InspectionPhase.Rejected
+                        : InspectionPhase.Passing);
+                    _rejectPending = false;
+                }
                 break;
 
             case InspectionPhase.Waiting:
-                SetPhase(InspectionPhase.Passing);
+                SetPhase(_rejectPending
+                    ? InspectionPhase.Rejected
+                    : InspectionPhase.Passing);
+                _rejectPending = false;
                 break;
 
             case InspectionPhase.Passing:
+                // A departed visual product finishes leaving. The next one
+                // represents an overweight event received after departure.
                 if (_elapsed >= PassSeconds)
                     SetPhase(InspectionPhase.Clearance);
                 break;

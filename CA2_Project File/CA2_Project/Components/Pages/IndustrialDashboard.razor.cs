@@ -1,11 +1,17 @@
+
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace CA2_Project.Components.Pages;
 
 public partial class IndustrialDashboard : IAsyncDisposable
 {
-
+    // ==========================================
     // 1. DATA SOURCE AND SYSTEM STATUS
+    // ==========================================
 
-    // Default to WAGO MQTT Mode.
     private bool UseMqttMode = true;
 
     private bool SimulationRun = false;
@@ -18,8 +24,12 @@ public partial class IndustrialDashboard : IAsyncDisposable
         DateTime.Now - Mqtt.LastUpdated.Value
             <= TimeSpan.FromSeconds(30);
 
+    // Simulated Network Loss affects simulated
+    // data only, not real MQTT communication.
     private bool DataAvailable =>
-        !UseMqttMode || HasLiveData;
+        UseMqttMode
+            ? HasLiveData
+            : !SimulatedNetworkLoss;
 
     private bool DisplayRun =>
         UseMqttMode
@@ -31,66 +41,53 @@ public partial class IndustrialDashboard : IAsyncDisposable
             ? Mqtt.SensorDetected
             : SimulationPnp;
 
+    // ==========================================
     // 2. WEIGHT MONITORING
+    // ==========================================
 
-    // Simulation Mode weight.
     private double WeightKg = 2.5;
-
-    // Maximum allowed simulated weight.
     private double WeightThresholdKg = 5.0;
-
-    // Assignment 1 Voltage Monitoring
-    // converted to simulated weight.
-    //
-    // Example:
-    // Voltage = 40 -> Weight = 4.00 kg
-    // Voltage = 60 -> Weight = 6.00 kg
 
     private double LiveWeightKg =>
         Mqtt.Voltage / 10.0;
 
-    // Checks live MQTT weight availability.
     private bool HasLiveWeightData =>
         HasLiveData &&
         Mqtt.HasVoltage &&
         !double.IsNaN(Mqtt.Voltage) &&
         !double.IsInfinity(Mqtt.Voltage);
 
-    // Weight source availability.
     private bool HasWeightData =>
-        !UseMqttMode || HasLiveWeightData;
+        UseMqttMode
+            ? HasLiveWeightData
+            : !SimulatedNetworkLoss;
 
-    // Selects the active weight source.
     private double DisplayWeightKg =>
         UseMqttMode
             ? LiveWeightKg
             : WeightKg;
 
-    // Overweight condition.
     private bool IsOverweight =>
         HasWeightData &&
         DisplayWeightKg > WeightThresholdKg;
 
-    // Excess above maximum allowed weight.
     private double ExcessWeightKg =>
         HasWeightData
             ? Math.Max(
                 0.0,
-                DisplayWeightKg - WeightThresholdKg
-              )
+                DisplayWeightKg - WeightThresholdKg)
             : 0.0;
 
+    // ==========================================
     // 3. WEIGHT ALARM STATE
+    // ==========================================
 
     private bool WeightBaselineReady = false;
-
     private bool PreviousOverweight = false;
-
     private bool WeightDataWasAvailable = false;
 
     private void EvaluateWeight()
     {
-        // No valid data: suspend alarm evaluation.
         if (!HasWeightData)
         {
             if (WeightDataWasAvailable)
@@ -98,20 +95,16 @@ public partial class IndustrialDashboard : IAsyncDisposable
                 AddEvent(
                     "WEIGHT DATA",
                     "Weight data unavailable. " +
-                    "Alarm evaluation suspended."
-                );
+                    "Alarm evaluation suspended.");
             }
 
             WeightDataWasAvailable = false;
             WeightBaselineReady = false;
-
             return;
         }
 
         bool current = IsOverweight;
 
-        // First reading / first valid reading
-        // after a source change or data recovery.
         if (!WeightBaselineReady)
         {
             WeightBaselineReady = true;
@@ -124,14 +117,12 @@ public partial class IndustrialDashboard : IAsyncDisposable
                     "WEIGHT ALARM",
                     $"OVERWEIGHT at initial reading: " +
                     $"{DisplayWeightKg:F2} kg. " +
-                    $"Limit: {WeightThresholdKg:F2} kg."
-                );
+                    $"Limit: {WeightThresholdKg:F2} kg.");
             }
 
             return;
         }
 
-        // Record only actual alarm state transitions.
         if (current != PreviousOverweight)
         {
             if (current)
@@ -140,8 +131,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
                     "WEIGHT ALARM",
                     $"OVERWEIGHT ALERT: " +
                     $"{DisplayWeightKg:F2} kg exceeds " +
-                    $"{WeightThresholdKg:F2} kg."
-                );
+                    $"{WeightThresholdKg:F2} kg.");
             }
             else
             {
@@ -149,8 +139,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
                     "WEIGHT RECOVERY",
                     $"Weight returned to normal: " +
                     $"{DisplayWeightKg:F2} kg. " +
-                    $"Limit: {WeightThresholdKg:F2} kg."
-                );
+                    $"Limit: {WeightThresholdKg:F2} kg.");
             }
         }
 
@@ -160,16 +149,16 @@ public partial class IndustrialDashboard : IAsyncDisposable
 
     private void ResetWeight()
     {
-        if (UseMqttMode)
-        {
+        if (UseMqttMode || SimulatedNetworkLoss)
             return;
-        }
 
         WeightKg = 0.0;
         EvaluateWeight();
     }
 
+    // ==========================================
     // 4. MONITORING MODES
+    // ==========================================
 
     private void ResetWeightBaseline()
     {
@@ -181,18 +170,22 @@ public partial class IndustrialDashboard : IAsyncDisposable
     private void EnableSimulationMode()
     {
         if (!UseMqttMode)
-        {
             return;
-        }
 
         UseMqttMode = false;
+
+        // Reset simulation fault state.
+        SimulatedNetworkLoss = false;
+        HeartbeatPaused = false;
+        SimulationHeartbeatFault = false;
+
+        LastSimulationHeartbeat = DateTime.Now;
 
         ResetWeightBaseline();
 
         AddEvent(
             "SYSTEM",
-            "Simulation Mode enabled."
-        );
+            "Simulation Mode enabled.");
 
         EvaluateWeight();
     }
@@ -200,9 +193,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
     private void EnableMqttMode()
     {
         if (UseMqttMode)
-        {
             return;
-        }
 
         UseMqttMode = true;
 
@@ -211,21 +202,20 @@ public partial class IndustrialDashboard : IAsyncDisposable
         AddEvent(
             "SYSTEM",
             "WAGO MQTT Monitoring enabled. " +
-            "Weight source: PLC Voltage / 10."
-        );
+            "Weight source: PLC Voltage / 10.");
 
         EvaluateWeight();
         CheckTelemetryHealth();
     }
 
+    // ==========================================
     // 5. NP9 / PNP SIMULATION
+    // ==========================================
 
     private void SimulateNp9()
     {
-        if (UseMqttMode)
-        {
+        if (UseMqttMode || SimulatedNetworkLoss)
             return;
-        }
 
         SimulationRun = !SimulationRun;
 
@@ -233,16 +223,13 @@ public partial class IndustrialDashboard : IAsyncDisposable
             "SIMULATION NP9",
             SimulationRun
                 ? "NP9 pressed. Simulation RUNNING."
-                : "NP9 pressed. Simulation STOPPED."
-        );
+                : "NP9 pressed. Simulation STOPPED.");
     }
 
     private void ToggleSimulatedPnp()
     {
-        if (UseMqttMode)
-        {
+        if (UseMqttMode || SimulatedNetworkLoss)
             return;
-        }
 
         SimulationPnp = !SimulationPnp;
 
@@ -250,11 +237,12 @@ public partial class IndustrialDashboard : IAsyncDisposable
             "SIMULATION PNP",
             SimulationPnp
                 ? "Simulated object detected."
-                : "Simulated object removed."
-        );
+                : "Simulated object removed.");
     }
 
+    // ==========================================
     // 6. MQTT CONNECTION
+    // ==========================================
 
     private async Task ConnectMqttAsync()
     {
@@ -266,8 +254,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
                 "MQTT",
                 Mqtt.IsConnected
                     ? "Connected to Beaver IoT broker."
-                    : "MQTT connection not established."
-            );
+                    : "MQTT connection not established.");
 
             CheckTelemetryHealth();
         }
@@ -275,12 +262,13 @@ public partial class IndustrialDashboard : IAsyncDisposable
         {
             AddEvent(
                 "MQTT ERROR",
-                ex.Message
-            );
+                ex.Message);
         }
     }
 
+    // ==========================================
     // 7. REMOTE START / STOP
+    // ==========================================
 
     private async Task SendCommandAsync(string command)
     {
@@ -288,9 +276,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
         {
             AddEvent(
                 "MQTT COMMAND",
-                "Command not sent. Broker disconnected."
-            );
-
+                "Command not sent. Broker disconnected.");
             return;
         }
 
@@ -298,8 +284,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
         {
             AddEvent(
                 "MQTT COMMAND",
-                $"{command} requested from Dashboard."
-            );
+                $"{command} requested from Dashboard.");
 
             await Mqtt.PublishCommandAsync(command);
         }
@@ -307,18 +292,18 @@ public partial class IndustrialDashboard : IAsyncDisposable
         {
             AddEvent(
                 "MQTT ERROR",
-                $"Command failed: {ex.Message}"
-            );
+                $"Command failed: {ex.Message}");
         }
     }
 
+    // ==========================================
     // 8. PHYSICAL WAGO EVENT MONITORING
+    // ==========================================
 
     private bool PhysicalBaselineReady = false;
 
     private bool PreviousPhysicalRun = false;
     private bool PreviousPhysicalPnp = false;
-
     private bool PreviousCountersAvailable = false;
 
     private uint PreviousNP9Count = 0;
@@ -339,7 +324,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
             return;
         }
 
-        // Process each telemetry update only once.
+        // Process each MQTT update only once.
         if (LastProcessedTelemetry.HasValue &&
             LastProcessedTelemetry.Value ==
                 Mqtt.LastUpdated.Value)
@@ -349,7 +334,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
 
         LastProcessedTelemetry = Mqtt.LastUpdated;
 
-        // Establish first PLC reading baseline.
+        // Establish initial PLC baseline.
         if (!PhysicalBaselineReady)
         {
             PreviousPhysicalRun = Mqtt.RunEnable;
@@ -368,8 +353,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
 
             AddEvent(
                 "WAGO TELEMETRY",
-                "Initial WAGO telemetry baseline received."
-            );
+                "Initial WAGO telemetry baseline received.");
 
             return;
         }
@@ -384,8 +368,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
                     "PHYSICAL NP9",
                     $"NP9 button pressed " +
                     $"{Mqtt.NP9PressCount - PreviousNP9Count} " +
-                    $"time(s)."
-                );
+                    "time(s).");
             }
 
             if (Mqtt.PNPDetectCount > PreviousDetectCount)
@@ -394,8 +377,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
                     "PHYSICAL PNP",
                     $"Object detected " +
                     $"{Mqtt.PNPDetectCount - PreviousDetectCount} " +
-                    $"time(s)."
-                );
+                    "time(s).");
             }
 
             if (Mqtt.PNPRemoveCount > PreviousRemoveCount)
@@ -404,42 +386,37 @@ public partial class IndustrialDashboard : IAsyncDisposable
                     "PHYSICAL PNP",
                     $"Object removed " +
                     $"{Mqtt.PNPRemoveCount - PreviousRemoveCount} " +
-                    $"time(s)."
-                );
+                    "time(s).");
             }
 
-            // PLC counters may reset after a restart.
             if (Mqtt.NP9PressCount < PreviousNP9Count ||
                 Mqtt.PNPDetectCount < PreviousDetectCount ||
                 Mqtt.PNPRemoveCount < PreviousRemoveCount)
             {
                 AddEvent(
                     "WAGO COUNTER",
-                    "PLC physical event counter reset detected."
-                );
+                    "PLC physical event counter reset detected.");
             }
         }
 
-        // PLC RunEnable state change.
+        // PLC run state change.
         if (Mqtt.RunEnable != PreviousPhysicalRun)
         {
             AddEvent(
                 "WAGO RUN STATE",
                 Mqtt.RunEnable
                     ? "PLC RunEnable changed to RUNNING."
-                    : "PLC RunEnable changed to STOPPED."
-            );
+                    : "PLC RunEnable changed to STOPPED.");
         }
 
-        // Physical PNP state change.
+        // Physical PNP change.
         if (Mqtt.SensorDetected != PreviousPhysicalPnp)
         {
             AddEvent(
                 "WAGO PNP",
                 Mqtt.SensorDetected
                     ? "Physical PNP: OBJECT DETECTED."
-                    : "Physical PNP: OBJECT REMOVED."
-            );
+                    : "Physical PNP: OBJECT REMOVED.");
         }
 
         // Analog input change.
@@ -454,14 +431,12 @@ public partial class IndustrialDashboard : IAsyncDisposable
                 $"Voltage changed from " +
                 $"{PreviousVoltage:F2} to " +
                 $"{Mqtt.Voltage:F2}. " +
-                $"Simulated Weight: " +
-                $"{LiveWeightKg:F2} kg."
-            );
+                $"Simulated Weight: {LiveWeightKg:F2} kg.");
 
             PreviousVoltage = Mqtt.Voltage;
         }
 
-        // Update values for next comparison.
+        // Update baseline values.
         PreviousPhysicalRun = Mqtt.RunEnable;
         PreviousPhysicalPnp = Mqtt.SensorDetected;
 
@@ -473,7 +448,9 @@ public partial class IndustrialDashboard : IAsyncDisposable
         PreviousRemoveCount = Mqtt.PNPRemoveCount;
     }
 
+    // ==========================================
     // 9. REAL MQTT TELEMETRY HEALTH
+    // ==========================================
 
     private bool TelemetryTimeoutLogged = false;
     private bool PreviousBrokerConnected = false;
@@ -482,33 +459,27 @@ public partial class IndustrialDashboard : IAsyncDisposable
     {
         bool connected = Mqtt.IsConnected;
 
-        // Broker connection state change.
         if (connected != PreviousBrokerConnected)
         {
             AddEvent(
                 "MQTT CONNECTION",
                 connected
                     ? "MQTT broker connected."
-                    : "MQTT broker disconnected."
-            );
+                    : "MQTT broker disconnected.");
 
             PreviousBrokerConnected = connected;
         }
 
-        // Timeout becomes meaningful only after
-        // at least one valid telemetry message.
+        // Only evaluate timeout after valid data.
         if (!Mqtt.HasReceivedData)
-        {
             return;
-        }
 
         if (!HasLiveData && !TelemetryTimeoutLogged)
         {
             AddEvent(
                 "TELEMETRY TIMEOUT",
                 "No fresh WAGO telemetry received " +
-                "within the 30-second monitoring window."
-            );
+                "within the 30-second monitoring window.");
 
             TelemetryTimeoutLogged = true;
         }
@@ -517,56 +488,83 @@ public partial class IndustrialDashboard : IAsyncDisposable
         {
             AddEvent(
                 "TELEMETRY RECOVERY",
-                "Fresh WAGO telemetry received again."
-            );
+                "Fresh WAGO telemetry received again.");
 
             TelemetryTimeoutLogged = false;
         }
     }
 
+    // ==========================================
     // 10. SIMULATED HEARTBEAT
+    // ==========================================
 
     private bool HeartbeatPaused = false;
     private bool SimulationHeartbeatFault = false;
 
-    private DateTime LastSimulationHeartbeat =
-        DateTime.Now;
+    private DateTime LastSimulationHeartbeat = DateTime.Now;
 
     private void PauseHeartbeat()
     {
+        if (UseMqttMode || HeartbeatPaused)
+            return;
+
         HeartbeatPaused = true;
 
         AddEvent(
             "HEARTBEAT",
-            "Simulation heartbeat paused."
-        );
+            "Simulation heartbeat paused.");
     }
 
     private void ResumeHeartbeat()
     {
+        if (UseMqttMode || !HeartbeatPaused)
+            return;
+
         HeartbeatPaused = false;
+
+        // Network Fault still blocks heartbeat.
+        if (SimulatedNetworkLoss)
+        {
+            AddEvent(
+                "HEARTBEAT",
+                "Manual pause cleared, but simulated " +
+                "network is still offline.");
+
+            return;
+        }
 
         LastSimulationHeartbeat = DateTime.Now;
 
-        if (SimulationHeartbeatFault)
-        {
-            SimulationHeartbeatFault = false;
-
-            AddEvent(
-                "HEARTBEAT RECOVERY",
-                "Simulation heartbeat restored."
-            );
-        }
+        ClearHeartbeatFaultIfRecovered();
 
         AddEvent(
             "HEARTBEAT",
-            "Simulation heartbeat resumed."
-        );
+            "Simulation heartbeat resumed.");
+    }
+
+    private void ClearHeartbeatFaultIfRecovered()
+    {
+        if (!SimulationHeartbeatFault)
+            return;
+
+        SimulationHeartbeatFault = false;
+
+        AddEvent(
+            "HEARTBEAT RECOVERY",
+            "Simulation heartbeat restored.");
     }
 
     private void UpdateSimulationHeartbeat()
     {
-        if (!HeartbeatPaused)
+        // Heartbeat updates only when:
+        // - simulation is active
+        // - heartbeat is not manually paused
+        // - network is healthy
+
+        if (UseMqttMode)
+            return;
+
+        if (!HeartbeatPaused && !SimulatedNetworkLoss)
         {
             if (DateTime.Now - LastSimulationHeartbeat
                 >= TimeSpan.FromSeconds(2))
@@ -575,6 +573,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
             }
         }
 
+        // Six-second timeout.
         bool timeout =
             DateTime.Now - LastSimulationHeartbeat
             > TimeSpan.FromSeconds(6);
@@ -586,8 +585,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
             AddEvent(
                 "HEARTBEAT TIMEOUT",
                 "Simulation heartbeat missing " +
-                "for more than six seconds."
-            );
+                "for more than six seconds.");
         }
 
         if (!timeout && SimulationHeartbeatFault)
@@ -596,36 +594,65 @@ public partial class IndustrialDashboard : IAsyncDisposable
 
             AddEvent(
                 "HEARTBEAT RECOVERY",
-                "Simulation heartbeat recovered."
-            );
+                "Simulation heartbeat recovered.");
         }
     }
 
+    // ==========================================
     // 11. NETWORK FAULT SIMULATION
+    // ==========================================
 
     private bool SimulatedNetworkLoss = false;
 
     private void SimulateNetworkLoss()
     {
+        if (UseMqttMode || SimulatedNetworkLoss)
+            return;
+
+        // Simulate loss of PLC communication.
         SimulatedNetworkLoss = true;
+
+        // No simulated heartbeat is generated while
+        // network fault remains active.
+        // The timeout is counted from the last heartbeat.
 
         AddEvent(
             "NETWORK FAULT",
-            "SIMULATED NETWORK CONNECTION LOST."
-        );
+            "SIMULATED NETWORK CONNECTION LOST. " +
+            "Simulated telemetry is unavailable.");
+
+        // Suspend weight alarm due to missing data.
+        EvaluateWeight();
     }
 
     private void RestoreNetwork()
     {
+        if (UseMqttMode || !SimulatedNetworkLoss)
+            return;
+
+        // Restore simulated communication.
         SimulatedNetworkLoss = false;
+
+        // Keep manually paused heartbeat independent.
+        if (!HeartbeatPaused)
+        {
+            LastSimulationHeartbeat = DateTime.Now;
+
+            ClearHeartbeatFaultIfRecovered();
+        }
 
         AddEvent(
             "NETWORK RECOVERY",
-            "Simulated network connection restored."
-        );
+            "Simulated network connection restored. " +
+            "Simulated telemetry is available.");
+
+        // Re-evaluate weight after data recovery.
+        EvaluateWeight();
     }
 
+    // ==========================================
     // 12. EVENT HISTORY
+    // ==========================================
 
     private sealed record DashboardEvent(
         DateTime Time,
@@ -633,8 +660,7 @@ public partial class IndustrialDashboard : IAsyncDisposable
         string Message
     );
 
-    private readonly List<DashboardEvent> Events =
-        new();
+    private readonly List<DashboardEvent> Events = new();
 
     private void AddEvent(
         string category,
@@ -645,11 +671,9 @@ public partial class IndustrialDashboard : IAsyncDisposable
             new DashboardEvent(
                 DateTime.Now,
                 category,
-                message
-            )
-        );
+                message));
 
-        // Retain latest 100 events.
+        // Keep latest 100 events.
         if (Events.Count > 100)
         {
             Events.RemoveAt(Events.Count - 1);
@@ -661,7 +685,9 @@ public partial class IndustrialDashboard : IAsyncDisposable
         Events.Clear();
     }
 
+    // ==========================================
     // 13. MQTT EVENT CALLBACKS
+    // ==========================================
 
     private void OnMqttDataChanged()
     {
@@ -671,7 +697,6 @@ public partial class IndustrialDashboard : IAsyncDisposable
 
             CheckTelemetryHealth();
 
-            // WAGO live weight alarm.
             if (UseMqttMode)
             {
                 EvaluateWeight();
@@ -693,7 +718,9 @@ public partial class IndustrialDashboard : IAsyncDisposable
         });
     }
 
+    // ==========================================
     // 14. BACKGROUND MONITORING LOOP
+    // ==========================================
 
     private CancellationTokenSource? MonitorCancellation;
     private Task? MonitorTask;
@@ -701,36 +728,28 @@ public partial class IndustrialDashboard : IAsyncDisposable
     protected override void OnInitialized()
     {
         Mqtt.DataChanged += OnMqttDataChanged;
-
         Mqtt.CommandEvent += OnCommandEvent;
 
         PreviousBrokerConnected = Mqtt.IsConnected;
-
         LastSimulationHeartbeat = DateTime.Now;
 
         AddEvent(
             "SYSTEM",
-            "Industrial IIoT Dashboard initialized."
-        );
+            "Industrial IIoT Dashboard initialized.");
 
         AddEvent(
             "WEIGHT MONITORING",
             "Weight Monitoring initialized. " +
-            "Default threshold: 5.00 kg."
-        );
+            "Default threshold: 5.00 kg.");
 
-        // Check initial weight source.
         EvaluateWeight();
-
-        // Process any telemetry already received.
         ProcessPhysicalTelemetry();
 
         MonitorCancellation =
             new CancellationTokenSource();
 
-        MonitorTask = MonitorAsync(
-            MonitorCancellation.Token
-        );
+        MonitorTask =
+            MonitorAsync(MonitorCancellation.Token);
     }
 
     private async Task MonitorAsync(
@@ -746,27 +765,32 @@ public partial class IndustrialDashboard : IAsyncDisposable
             {
                 await InvokeAsync(() =>
                 {
+                    // Simulated heartbeat detection.
                     UpdateSimulationHeartbeat();
 
+                    // Real MQTT health monitoring.
                     CheckTelemetryHealth();
 
-                    // Re-check weight when telemetry expires.
+                    // Re-check weight on data timeout.
                     if (UseMqttMode)
                     {
                         EvaluateWeight();
                     }
 
+                    // Refresh dashboard every second.
                     StateHasChanged();
                 });
             }
         }
         catch (OperationCanceledException)
         {
-            // Expected when the component closes.
+            // Expected when page is closed.
         }
     }
 
+    // ==========================================
     // 15. CLEANUP
+    // ==========================================
 
     public async ValueTask DisposeAsync()
     {

@@ -9,6 +9,7 @@
 <PageTitle>CA2 Industrial IIoT Dashboard</PageTitle>
 
 <div class="industrial-page">
+
     <!-- HEADER -->
     <div class="industrial-header">
         <h2 class="fw-bold">
@@ -28,61 +29,75 @@
             C# Blazor
         </span>
     </div>
+
     <!-- MONITORING DATA SOURCE -->
     <div class="industrial-card mb-3">
         <h5>Monitoring Data Source</h5>
+
         <div class="d-flex flex-wrap gap-2">
-            <button class="btn @(UseMqttMode
-                                    ? "btn-outline-primary"
-                                    : "btn-primary")"
+            <button class="btn @(UseMqttMode ? "btn-outline-primary" : "btn-primary")"
                     @onclick="EnableSimulationMode">
                 Simulation Mode
             </button>
-            <button class="btn @(UseMqttMode
-                                    ? "btn-primary"
-                                    : "btn-outline-primary")"
+
+            <button class="btn @(UseMqttMode ? "btn-primary" : "btn-outline-primary")"
                     @onclick="EnableMqttMode">
                 WAGO MQTT Monitoring
             </button>
         </div>
+
         <div class="industrial-info mt-3">
             @if (UseMqttMode)
             {
                 <strong>WAGO Live Monitoring</strong>
                 <div class="mt-2">
-                    Weight is calculated from the
-                    Voltage value received through MQTT.
+                    Weight is calculated from the Voltage
+                    value received through MQTT.
                 </div>
                 <div class="mt-1">
                     Conversion:
                     <strong>Weight = Voltage / 10</strong>
                 </div>
                 <div class="mt-1">
-                    The Weight Slider is disabled
-                    in this mode.
+                    The Weight Slider is disabled in this mode.
                 </div>
             }
             else
             {
                 <strong>Software Simulation</strong>
                 <div class="mt-2">
-                    Weight, NP9 and PNP can be
-                    simulated directly from the Dashboard.
+                    Weight, NP9 and PNP can be simulated
+                    directly from the Dashboard.
+                </div>
+                <div class="mt-1">
+                    Network faults and heartbeat timeouts
+                    can be demonstrated without connecting
+                    to the physical WAGO PLC.
                 </div>
             }
         </div>
     </div>
+
     <!-- SYSTEM OVERVIEW -->
     <div class="industrial-section">
         System Overview
     </div>
+
     <div class="industrial-grid">
-        <!-- RUN STATUS -->
+
+        <!-- SYSTEM STATUS -->
         <div class="industrial-card">
             <div class="industrial-label">
                 System Status
             </div>
-            @if (!DataAvailable)
+
+            @if (!UseMqttMode && SimulatedNetworkLoss)
+            {
+                <div class="industrial-value industrial-danger">
+                    COMMUNICATION LOST
+                </div>
+            }
+            else if (!DataAvailable)
             {
                 <div class="industrial-value industrial-muted">
                     NO DATA
@@ -100,15 +115,18 @@
                     STOPPED
                 </div>
             }
+
             <div class="industrial-label mt-2">
-                PLC Internal RunEnable State
+                PLC Internal RunEnable State / Simulation
             </div>
         </div>
+
         <!-- PNP SENSOR -->
         <div class="industrial-card">
             <div class="industrial-label">
                 PNP Proximity Sensor
             </div>
+
             @if (!DataAvailable)
             {
                 <div class="industrial-value industrial-muted">
@@ -127,23 +145,24 @@
                     NOT DETECTED
                 </div>
             }
+
             <div class="industrial-label mt-2">
                 Physical DI2 / Simulation
             </div>
         </div>
+
         <!-- WEIGHT STATUS -->
         <div class="industrial-card">
             <div class="industrial-label">
                 Simulated Product Weight
             </div>
+
             @if (HasWeightData)
             {
-                <div class="industrial-value
-                    @(IsOverweight
-                      ? "industrial-danger"
-                      : "industrial-good")">
+                <div class="industrial-value @(IsOverweight ? "industrial-danger" : "industrial-good")">
                     @DisplayWeightKg.ToString("F2") kg
                 </div>
+
                 <div class="mt-2">
                     @if (IsOverweight)
                     {
@@ -165,21 +184,36 @@
                     NO DATA
                 </div>
             }
+
             <div class="industrial-label mt-2">
                 @(UseMqttMode
-                  ? "Converted from WAGO Voltage"
-                  : "Software Simulated Weight")
+                    ? "Converted from WAGO Voltage"
+                    : "Software Simulated Weight")
             </div>
         </div>
+
         <!-- DEVICE HEALTH -->
         <div class="industrial-card">
             <div class="industrial-label">
                 Device Health
             </div>
-            @if (!UseMqttMode)
+
+            @if (!UseMqttMode && SimulatedNetworkLoss)
+            {
+                <div class="industrial-value industrial-danger">
+                    SIMULATED PLC OFFLINE
+                </div>
+            }
+            else if (!UseMqttMode && SimulationHeartbeatFault)
+            {
+                <div class="industrial-value industrial-danger">
+                    HEARTBEAT TIMEOUT
+                </div>
+            }
+            else if (!UseMqttMode)
             {
                 <div class="industrial-value industrial-good">
-                    SIMULATION
+                    SIMULATION ONLINE
                 </div>
             }
             else if (HasLiveData)
@@ -194,31 +228,38 @@
                     NO DATA
                 </div>
             }
+
             <div class="industrial-label mt-2">
-                MQTT Telemetry Freshness
+                @(UseMqttMode
+                    ? "MQTT Telemetry Freshness"
+                    : "Simulated Communication Health")
             </div>
         </div>
+
     </div>
+
     <!-- WEIGHT MONITORING -->
     <div class="industrial-section">
         Weight Monitoring and Overload Detection
     </div>
+
     <div class="industrial-grid-two">
+
         <!-- WEIGHT MEASUREMENT -->
         <div class="industrial-card">
             <h5>Weight Measurement</h5>
+
             <div class="industrial-reading mb-4">
                 <div class="industrial-label">
                     Current Simulated Weight
                 </div>
+
                 @if (HasWeightData)
                 {
-                    <div class="industrial-reading-number
-                        @(IsOverweight
-                          ? "industrial-danger"
-                          : "industrial-good")">
+                    <div class="industrial-reading-number @(IsOverweight ? "industrial-danger" : "industrial-good")">
                         @DisplayWeightKg.ToString("F2") kg
                     </div>
+
                     @if (IsOverweight)
                     {
                         <span class="badge bg-danger">
@@ -234,107 +275,116 @@
                 }
                 else
                 {
-                    <div class="industrial-reading-number
-                        industrial-muted">
+                    <div class="industrial-reading-number industrial-muted">
                         NO DATA
                     </div>
                     <span class="badge bg-secondary">
-                        WAITING FOR WAGO
+                        DATA UNAVAILABLE
                     </span>
                 }
             </div>
+
             <!-- LIVE WAGO SOURCE -->
             @if (UseMqttMode)
             {
                 <div class="industrial-info mb-3">
                     <strong>WAGO Live Weight Source</strong>
+
                     <div class="mt-2">
                         PLC Voltage:
                         <strong>
-                            @(HasWeightData
-                              ? $"{Mqtt.Voltage:F2}"
-                              : "NO DATA")
+                            @(HasWeightData ? $"{Mqtt.Voltage:F2}" : "NO DATA")
                         </strong>
                     </div>
+
                     <div class="mt-2">
                         Simulated Weight:
                         <strong>
-                            @(HasWeightData
-                              ? $"{LiveWeightKg:F2} kg"
-                              : "NO DATA")
+                            @(HasWeightData ? $"{LiveWeightKg:F2} kg" : "NO DATA")
                         </strong>
                     </div>
+
                     <div class="mt-2">
                         Formula:
                         <strong>
                             Weight (kg) = Voltage / 10
                         </strong>
                     </div>
+
                     <div class="mt-2">
                         Adjust the physical input device
                         to change the reported value.
                     </div>
                 </div>
             }
-            <!-- SOFTWARE WEIGHT INPUT -->
+
+            <!-- WEIGHT INPUT -->
             <label class="form-label fw-bold">
                 Weight Input
             </label>
+
             <div class="d-flex justify-content-between mb-2">
                 <span class="industrial-label">
                     @(UseMqttMode
-                      ? "WAGO-controlled value"
-                      : "Manual simulated weight")
+                        ? "WAGO-controlled value"
+                        : "Manual simulated weight")
                 </span>
+
                 <strong>
                     @(HasWeightData
-                      ? $"{DisplayWeightKg:F2} kg"
-                      : "NO DATA")
+                        ? $"{DisplayWeightKg:F2} kg"
+                        : "NO DATA")
                 </strong>
             </div>
-@if (UseMqttMode)
-{
-    <input type="range"
-           class="form-range"
-           min="0"
-           max="@Math.Max(10.0, Math.Ceiling(DisplayWeightKg))"
-           step="0.1"
-           value="@DisplayWeightKg.ToString(
-               System.Globalization.CultureInfo.InvariantCulture)"
-           disabled />
-}
-else
-{
-    <input type="range"
-           class="form-range"
-           min="0"
-           max="10"
-           step="0.1"
-           @bind="WeightKg"
-           @bind:event="oninput"
-           @bind:after="EvaluateWeight" />
-}
-            <div class="d-flex justify-content-between
-                industrial-label mb-3">
+
+            @if (UseMqttMode)
+            {
+                <input type="range"
+                       class="form-range"
+                       min="0"
+                       max="@Math.Max(10.0, Math.Ceiling(DisplayWeightKg))"
+                       step="0.1"
+                       value="@DisplayWeightKg.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                       disabled />
+            }
+            else
+            {
+                <input type="range"
+                       class="form-range"
+                       min="0"
+                       max="10"
+                       step="0.1"
+                       disabled="@SimulatedNetworkLoss"
+                       @bind="WeightKg"
+                       @bind:event="oninput"
+                       @bind:after="EvaluateWeight" />
+            }
+
+            <div class="d-flex justify-content-between industrial-label mb-3">
                 <span>0 kg</span>
                 <span>10 kg</span>
             </div>
+
             <button class="btn btn-outline-secondary btn-sm"
-                    disabled="@UseMqttMode"
+                    disabled="@(UseMqttMode || SimulatedNetworkLoss)"
                     @onclick="ResetWeight">
                 Reset Weight
             </button>
+
             <p class="industrial-label mt-3 mb-0">
                 This is a simulated engineering weight.
                 No calibrated physical load cell is connected.
             </p>
         </div>
+
         <!-- WEIGHT THRESHOLD -->
         <div class="industrial-card">
             <h5>Overweight Threshold Configuration</h5>
+
             <label class="form-label fw-bold">
                 Maximum Allowed Weight
             </label>
+
             <div class="d-flex justify-content-between mb-2">
                 <span class="industrial-label">
                     Configurable Weight Limit
@@ -343,6 +393,7 @@ else
                     @WeightThresholdKg.ToString("F2") kg
                 </strong>
             </div>
+
             <input type="range"
                    class="form-range"
                    min="0.5"
@@ -351,39 +402,50 @@ else
                    @bind="WeightThresholdKg"
                    @bind:event="oninput"
                    @bind:after="EvaluateWeight" />
+
             <hr />
+
             @if (!HasWeightData)
             {
                 <div class="alert alert-warning">
-                    <strong>WEIGHT DATA UNAVAILABLE</strong>
+                    <strong>
+                        WEIGHT DATA UNAVAILABLE
+                    </strong>
+
                     <p class="mt-2 mb-0">
-                        Fresh WAGO Voltage data is not
-                        available.
-                        Weight alarm evaluation
-                        is suspended.
+                        @(UseMqttMode
+                            ? "Fresh WAGO Voltage data is not available."
+                            : "Simulated telemetry is unavailable due to network fault.")
+                        Weight alarm evaluation is suspended.
                     </p>
                 </div>
             }
             else if (IsOverweight)
             {
                 <div class="alert alert-danger">
-                    <strong>OVERWEIGHT ALERT</strong>
+                    <strong>
+                        OVERWEIGHT ALERT
+                    </strong>
+
                     <p class="mt-2">
-                        Simulated product weight
-                        exceeds the configured limit.
+                        Simulated product weight exceeds
+                        the configured limit.
                     </p>
+
                     <div>
                         Current Weight:
                         <strong>
                             @DisplayWeightKg.ToString("F2") kg
                         </strong>
                     </div>
+
                     <div>
                         Maximum Weight:
                         <strong>
                             @WeightThresholdKg.ToString("F2") kg
                         </strong>
                     </div>
+
                     <div>
                         Excess Weight:
                         <strong>
@@ -395,29 +457,38 @@ else
             else
             {
                 <div class="alert alert-success">
-                    <strong>WEIGHT NORMAL</strong>
+                    <strong>
+                        WEIGHT NORMAL
+                    </strong>
+
                     <p class="mt-2 mb-0">
                         Simulated weight is within
                         the configured limit.
                     </p>
                 </div>
             }
+
             <div class="industrial-label">
                 Overweight and recovery events
                 are recorded in Event History.
             </div>
         </div>
     </div>
+
     <!-- MQTT COMMUNICATION -->
     <div class="industrial-section">
         MQTT Communication
     </div>
+
     <div class="industrial-grid-two">
+
         <!-- MQTT BROKER -->
         <div class="industrial-card">
             <h5>Beaver IoT Broker</h5>
+
             <div class="mb-3">
                 <strong>Broker Status:</strong>
+
                 @if (Mqtt.IsConnected)
                 {
                     <span class="badge bg-success">
@@ -431,68 +502,80 @@ else
                     </span>
                 }
             </div>
+
             <div class="mb-2">
                 <strong>Broker:</strong>
                 192.168.101.59:1883
             </div>
+
             <div class="mb-2">
                 <strong>Device ID:</strong>
                 @Mqtt.DeviceId
             </div>
+
             <div class="mb-2">
                 <strong>Device Name:</strong>
                 @Mqtt.DeviceName
             </div>
+
             <hr />
+
             <h6 class="fw-bold">
                 Received WAGO MQTT Sensor Data
             </h6>
+
             <div class="mb-2">
                 <strong>PNP Sensor:</strong>
                 @(HasLiveData
-                  ? (Mqtt.SensorDetected
-                      ? "DETECTED"
-                      : "NOT DETECTED")
-                  : "NO DATA")
+                    ? (Mqtt.SensorDetected ? "DETECTED" : "NOT DETECTED")
+                    : "NO DATA")
             </div>
+
             <div class="mb-2">
                 <strong>Voltage:</strong>
                 @(HasLiveData && Mqtt.HasVoltage
-                  ? $"{Mqtt.Voltage:F2}"
-                  : "NO DATA")
+                    ? $"{Mqtt.Voltage:F2}"
+                    : "NO DATA")
             </div>
+
             <div class="mb-2">
                 <strong>Simulated Weight:</strong>
                 @(HasLiveWeightData
-                  ? $"{LiveWeightKg:F2} kg"
-                  : "NO DATA")
+                    ? $"{LiveWeightKg:F2} kg"
+                    : "NO DATA")
             </div>
+
             <div class="mb-2">
                 <strong>Run Enable:</strong>
                 @(HasLiveData
-                  ? Mqtt.RunEnable.ToString()
-                  : "NO DATA")
+                    ? Mqtt.RunEnable.ToString()
+                    : "NO DATA")
             </div>
+
             <div class="mb-2">
                 <strong>Device Status:</strong>
                 @Mqtt.DeviceStatus
             </div>
+
             <div class="mb-2">
                 <strong>Data Freshness:</strong>
                 @(HasLiveData
-                  ? "FRESH"
-                  : "STALE / UNAVAILABLE")
+                    ? "FRESH"
+                    : "STALE / UNAVAILABLE")
             </div>
+
             <div class="mb-3">
                 <strong>Last Update:</strong>
-                @(Mqtt.LastUpdated?.ToString(
-                    "yyyy-MM-dd HH:mm:ss") ?? "NO DATA")
+                @(Mqtt.LastUpdated?.ToString("yyyy-MM-dd HH:mm:ss")
+                    ?? "NO DATA")
             </div>
+
             <button class="btn btn-primary"
                     disabled="@Mqtt.IsConnected"
                     @onclick="ConnectMqttAsync">
                 Connect MQTT
             </button>
+
             @if (!string.IsNullOrWhiteSpace(Mqtt.LastError))
             {
                 <div class="alert alert-warning mt-3 mb-0">
@@ -500,91 +583,108 @@ else
                 </div>
             }
         </div>
-        <!-- REMOTE START / STOP -->
+
+        <!-- REMOTE CONTROL -->
         <div class="industrial-card">
             <h5>Remote START / STOP Control</h5>
+
             <p class="industrial-label">
-                Dashboard commands are published
-                through Beaver IoT MQTT to the
-                WAGO PLC.
+                Dashboard commands are published through
+                Beaver IoT MQTT to the WAGO PLC.
             </p>
+
             <div class="d-flex flex-wrap gap-2 mb-3">
                 <button class="btn btn-success"
                         disabled="@(!Mqtt.IsConnected || Mqtt.IsCommandPending)"
                         @onclick='() => SendCommandAsync("START")'>
                     Publish START
                 </button>
+
                 <button class="btn btn-danger"
                         disabled="@(!Mqtt.IsConnected || Mqtt.IsCommandPending)"
                         @onclick='() => SendCommandAsync("STOP")'>
                     Publish STOP
                 </button>
             </div>
+
             <div class="mb-2">
                 <strong>Last Command:</strong>
                 @Mqtt.LastCommand
             </div>
+
             <div class="mb-2">
                 <strong>Command State:</strong>
                 @Mqtt.CommandState
             </div>
+
             <div class="mb-2">
                 <strong>Command Detail:</strong>
                 @Mqtt.CommandDetail
             </div>
+
             <div class="mb-2">
                 <strong>Command ID:</strong>
                 <span class="industrial-label">
                     @Mqtt.LastCommandId
                 </span>
             </div>
+
             <div class="industrial-info mt-3">
-                Remote START / STOP changes only
-                the internal PLC RunEnable test state.
+                Remote START / STOP changes only the internal
+                PLC RunEnable test state.
                 It does not operate a physical motor.
-                A matching acknowledgement is
-                needed to confirm command execution.
+                A matching acknowledgement is needed
+                to confirm command execution.
             </div>
         </div>
     </div>
-    <!-- RAW MQTT PAYLOAD -->
+
+    <!-- RAW MQTT MESSAGE -->
     <div class="industrial-card mt-3">
         <h5>Last MQTT Telemetry Message</h5>
+
         <div class="industrial-message">
             @Mqtt.LastMessage
         </div>
+
         <div class="industrial-label mt-3">
             Topic:
             @MqttDashboardService.TelemetryTopic
         </div>
+
         <div class="industrial-card mt-3">
             <h5>MQTT Telemetry Diagnostics</h5>
+
             <div class="mb-2">
                 <strong>Telemetry Messages Received:</strong>
                 @Mqtt.TelemetryReceivedCount
             </div>
+
             <div class="mb-2">
                 <strong>Telemetry Parse Errors:</strong>
                 @Mqtt.TelemetryErrorCount
             </div>
+
             <div class="mb-2">
                 <strong>Last Message Received:</strong>
-                @(Mqtt.LastMessageReceivedAt?.ToString(
-                    "HH:mm:ss") ?? "NO DATA")
+                @(Mqtt.LastMessageReceivedAt?.ToString("HH:mm:ss")
+                    ?? "NO DATA")
             </div>
+
             <div class="mb-2">
                 <strong>Last Valid Telemetry:</strong>
-                @(Mqtt.LastUpdated?.ToString(
-                    "HH:mm:ss") ?? "NO DATA")
+                @(Mqtt.LastUpdated?.ToString("HH:mm:ss")
+                    ?? "NO DATA")
             </div>
+
             <div class="mb-2">
                 <strong>Parsed Voltage:</strong>
                 @(Mqtt.HasVoltage
-                  ? $"{Mqtt.Voltage:F2}"
-                  : "NO DATA")
+                    ? $"{Mqtt.Voltage:F2}"
+                    : "NO DATA")
             </div>
-            @if (!string.IsNullOrWhiteSpace(
-                Mqtt.LastTelemetryError))
+
+            @if (!string.IsNullOrWhiteSpace(Mqtt.LastTelemetryError))
             {
                 <div class="alert alert-danger mt-3">
                     <strong>Telemetry Parse Error:</strong>
@@ -593,10 +693,12 @@ else
             }
         </div>
     </div>
+
     <!-- PHYSICAL HARDWARE EVENTS -->
     <div class="industrial-section">
         Physical Hardware Event Monitoring
     </div>
+
     <div class="industrial-card">
         @if (HasLiveData && Mqtt.HasPhysicalEventCounters)
         {
@@ -609,6 +711,7 @@ else
                         @Mqtt.NP9PressCount
                     </div>
                 </div>
+
                 <div>
                     <div class="industrial-label">
                         PNP Object Detected
@@ -617,6 +720,7 @@ else
                         @Mqtt.PNPDetectCount
                     </div>
                 </div>
+
                 <div>
                     <div class="industrial-label">
                         PNP Object Removed
@@ -625,6 +729,7 @@ else
                         @Mqtt.PNPRemoveCount
                     </div>
                 </div>
+
                 <div>
                     <div class="industrial-label">
                         Telemetry Interval
@@ -646,68 +751,95 @@ else
             </div>
         }
     </div>
+
     <!-- SIMULATION CONTROLS -->
     <div class="industrial-section">
         Local Input Simulation
     </div>
+
     <div class="industrial-grid-two">
-        <!-- NP9 SIMULATION -->
+
         <div class="industrial-card">
             <h5>NP9 Push Button Simulation</h5>
+
             <div class="mb-3">
                 Current State:
                 <strong>
-                    @(SimulationRun
-                      ? "RUNNING"
-                      : "STOPPED")
+                    @(SimulationRun ? "RUNNING" : "STOPPED")
                 </strong>
             </div>
+
             <button class="btn btn-primary"
-                    disabled="@UseMqttMode"
+                    disabled="@(UseMqttMode || SimulatedNetworkLoss)"
                     @onclick="SimulateNp9">
                 Press NP9 Button
             </button>
+
             <p class="industrial-label mt-3 mb-0">
                 Software simulation only.
                 Does not change the physical PLC input.
             </p>
         </div>
-        <!-- PNP SIMULATION -->
+
         <div class="industrial-card">
             <h5>PNP Sensor Simulation</h5>
+
             <div class="mb-3">
                 Sensor State:
                 <strong>
-                    @(SimulationPnp
-                      ? "DETECTED"
-                      : "NOT DETECTED")
+                    @(SimulationPnp ? "DETECTED" : "NOT DETECTED")
                 </strong>
             </div>
+
             <button class="btn btn-outline-primary"
-                    disabled="@UseMqttMode"
+                    disabled="@(UseMqttMode || SimulatedNetworkLoss)"
                     @onclick="ToggleSimulatedPnp">
                 Toggle PNP Sensor
             </button>
+
             <p class="industrial-label mt-3 mb-0">
                 Simulates product detection
                 without changing WAGO DI2.
             </p>
         </div>
     </div>
-    <!-- FAULT DETECTION AND HEARTBEAT -->
+
+    <!-- FAULT DETECTION -->
     <div class="industrial-section">
         Fault Detection and Heartbeat
     </div>
+
     <div class="industrial-grid-two">
+
         <!-- HEARTBEAT -->
         <div class="industrial-card">
             <h5>Simulation Heartbeat Monitoring</h5>
+
             <div class="mb-3">
                 <strong>Status:</strong>
-                @if (SimulationHeartbeatFault)
+
+                @if (UseMqttMode)
+                {
+                    <span class="badge bg-secondary">
+                        SIMULATION INACTIVE
+                    </span>
+                }
+                else if (SimulationHeartbeatFault)
                 {
                     <span class="badge bg-danger">
                         HEARTBEAT TIMEOUT
+                    </span>
+                }
+                else if (SimulatedNetworkLoss)
+                {
+                    <span class="badge bg-warning text-dark">
+                        NETWORK LOST - AWAITING TIMEOUT
+                    </span>
+                }
+                else if (HeartbeatPaused)
+                {
+                    <span class="badge bg-warning text-dark">
+                        HEARTBEAT PAUSED
                     </span>
                 }
                 else
@@ -717,31 +849,41 @@ else
                     </span>
                 }
             </div>
+
             <p class="industrial-label">
-                Simulated heartbeat interval:
-                2 seconds.
-                Timeout threshold:
-                6 seconds.
+                Simulated heartbeat interval: 2 seconds.
+                Timeout threshold: 6 seconds.
             </p>
+
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-warning"
-                        disabled="@HeartbeatPaused"
+                        disabled="@(UseMqttMode || HeartbeatPaused)"
                         @onclick="PauseHeartbeat">
                     Pause Heartbeat
                 </button>
+
                 <button class="btn btn-success"
-                        disabled="@(!HeartbeatPaused)"
+                        disabled="@(UseMqttMode || !HeartbeatPaused)"
                         @onclick="ResumeHeartbeat">
                     Resume Heartbeat
                 </button>
             </div>
         </div>
+
         <!-- NETWORK FAULT -->
         <div class="industrial-card">
             <h5>Network Fault Simulation</h5>
+
             <div class="mb-3">
                 <strong>Status:</strong>
-                @if (SimulatedNetworkLoss)
+
+                @if (UseMqttMode)
+                {
+                    <span class="badge bg-secondary">
+                        SIMULATION INACTIVE
+                    </span>
+                }
+                else if (SimulatedNetworkLoss)
                 {
                     <span class="badge bg-danger">
                         NETWORK FAULT
@@ -754,39 +896,45 @@ else
                     </span>
                 }
             </div>
+
             <p class="industrial-label">
                 Software-only fault demonstration.
                 Actual MQTT communication is not disconnected.
             </p>
+
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-danger"
-                        disabled="@SimulatedNetworkLoss"
+                        disabled="@(UseMqttMode || SimulatedNetworkLoss)"
                         @onclick="SimulateNetworkLoss">
                     Simulate Network Loss
                 </button>
+
                 <button class="btn btn-success"
-                        disabled="@(!SimulatedNetworkLoss)"
+                        disabled="@(UseMqttMode || !SimulatedNetworkLoss)"
                         @onclick="RestoreNetwork">
                     Restore Network
                 </button>
             </div>
         </div>
     </div>
+
     <!-- EVENT HISTORY -->
     <div class="industrial-section">
         Event History and Alarm Log
     </div>
+
     <div class="industrial-card">
-        <div class="d-flex justify-content-between
-            align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">
                 System Event History
             </h5>
+
             <button class="btn btn-outline-secondary btn-sm"
                     @onclick="ClearHistory">
                 Clear History
             </button>
         </div>
+
         <div class="industrial-log">
             @if (Events.Count == 0)
             {
@@ -805,6 +953,7 @@ else
                                 <th>Description</th>
                             </tr>
                         </thead>
+
                         <tbody>
                             @foreach (var entry in Events)
                             {
@@ -813,13 +962,9 @@ else
                                         @entry.Time.ToString("HH:mm:ss")
                                     </td>
                                     <td>
-                                        <strong>
-                                            @entry.Category
-                                        </strong>
+                                        <strong>@entry.Category</strong>
                                     </td>
-                                    <td>
-                                        @entry.Message
-                                    </td>
+                                    <td>@entry.Message</td>
                                 </tr>
                             }
                         </tbody>
@@ -829,19 +974,17 @@ else
         </div>
     </div>
 
-    
-<!-- LIVE CONVEYOR VISUALIZATION -->
-<div class="industrial-section">
-    Live Conveyor Visualization
-</div>
+    <!-- CONVEYOR VISUALIZATION -->
+    <div class="industrial-section">
+        Live Conveyor Visualization
+    </div>
 
-<ConveyorVisualization
-    IsRunning="@(DataAvailable && DisplayRun)"
-    IsDetected="@(DataAvailable && DisplayPnp)"
-    WeightKg="@DisplayWeightKg"
-    WeightLimitKg="@WeightThresholdKg"
-    HasData="@(DataAvailable && (!UseMqttMode || HasWeightData))"
-    IsMqttMode="@UseMqttMode" />
+    <ConveyorVisualization IsRunning="@(DataAvailable && DisplayRun)"
+                           IsDetected="@(DataAvailable && DisplayPnp)"
+                           WeightKg="@DisplayWeightKg"
+                           WeightLimitKg="@WeightThresholdKg"
+                           HasData="@(DataAvailable && (!UseMqttMode || HasWeightData))"
+                           IsMqttMode="@UseMqttMode" />
 
     <!-- FOOTER -->
     <div class="text-center industrial-label mt-4">
@@ -855,4 +998,5 @@ else
             No physical load cell is used.
         </div>
     </div>
+
 </div>
