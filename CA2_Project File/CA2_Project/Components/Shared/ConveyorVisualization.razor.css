@@ -1,0 +1,479 @@
+﻿
+.cv-card {
+    background: #fff;
+    border: 1px solid #dce5ee;
+    border-radius: 14px;
+    padding: 20px;
+    margin: 18px 0;
+    box-shadow: 0 3px 14px rgba(20, 46, 77, 0.06);
+    font-family: inherit;
+}
+
+.cv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.cv-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #16314e;
+}
+
+.cv-subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #71849a;
+}
+
+.cv-badge {
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+}
+
+.cv-status-running,
+.cv-status-pass {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.cv-status-wait {
+    color: #92400e;
+    background: #fef3c7;
+}
+
+.cv-status-reject {
+    color: #991b1b;
+    background: #fee2e2;
+}
+
+.cv-status-offline,
+.cv-status-stopped {
+    color: #475569;
+    background: #e2e8f0;
+}
+
+.cv-scene {
+    background: linear-gradient(160deg, #0d2036, #183650);
+    color: #e8f2fc;
+    border-radius: 12px;
+    padding: 16px;
+    overflow: hidden;
+}
+
+.cv-scene-top,
+.cv-scene-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: #a8c4dc;
+}
+
+.cv-mode {
+    border: 1px solid #47627d;
+    border-radius: 5px;
+    padding: 4px 7px;
+    color: #b9dff5;
+}
+
+.cv-animation-area {
+    height: 230px;
+    position: relative;
+    margin: 14px 0 5px;
+}
+
+.cv-sensor {
+    position: absolute;
+    left: 50%;
+    top: 9px;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cv-sensor-body {
+    width: 41px;
+    height: 29px;
+    background: #34536e;
+    border: 2px solid #8ba9c1;
+    border-radius: 5px;
+    display: grid;
+    place-items: center;
+}
+
+.cv-sensor-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #64748b;
+    box-shadow: 0 0 4px #475569;
+}
+
+.cv-detected .cv-sensor-light {
+    background: #22c55e;
+    box-shadow: 0 0 12px #22c55e;
+}
+
+.cv-sensor-beam {
+    width: 2px;
+    height: 70px;
+    border-left: 2px dashed #64748b;
+    opacity: 0.7;
+}
+
+.cv-detected .cv-sensor-beam {
+    border-color: #4ade80;
+    opacity: 1;
+}
+
+.cv-sensor-label {
+    position: absolute;
+    top: -17px;
+    white-space: nowrap;
+    font-size: 9px;
+    font-weight: 700;
+    color: #b8d8ec;
+}
+
+.cv-conveyor {
+    position: absolute;
+    left: 5%;
+    right: 5%;
+    top: 137px;
+    height: 62px;
+}
+
+.cv-belt {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 43px;
+    border-radius: 23px;
+    background: #253c54;
+    border: 3px solid #7994aa;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.cv-belt-pattern {
+    position: absolute;
+    inset: 5px 10px;
+    background: repeating-linear-gradient( 90deg, transparent 0, transparent 22px, #64849f 23px, #64849f 26px );
+    opacity: 0.85;
+}
+
+.cv-moving {
+    animation: cv-belt-scroll 0.55s linear infinite;
+}
+
+.cv-roller {
+    position: absolute;
+    top: 2px;
+    width: 40px;
+    height: 40px;
+    background: #243b52;
+    border: 3px solid #a1b7c9;
+    border-radius: 50%;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+}
+
+.cv-roller-left {
+    left: 0;
+}
+
+.cv-roller-right {
+    right: 0;
+}
+
+.cv-roller-center {
+    width: 13px;
+    height: 13px;
+    background: #8ba6bd;
+    border: 3px solid #253e56;
+    border-radius: 50%;
+}
+
+.cv-spinning {
+    animation: cv-roller-spin 0.7s linear infinite;
+}
+
+.cv-leg {
+    position: absolute;
+    top: 41px;
+    width: 13px;
+    height: 40px;
+    background: #58738c;
+    z-index: 1;
+}
+
+.cv-leg-left {
+    left: 14%;
+}
+
+.cv-leg-right {
+    right: 14%;
+}
+
+.cv-product {
+    position: absolute;
+    top: 83px;
+    left: 50%;
+    width: 72px;
+    height: 54px;
+    transform: translateX(-50%);
+    border-radius: 5px 5px 2px 2px;
+    background: linear-gradient(135deg, #e6ba83, #be8957);
+    border: 2px solid #f0c895;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.3);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.cv-product-tape {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 9px;
+    transform: translateX(-50%);
+    background: rgba(118, 79, 40, 0.25);
+}
+
+.cv-product-symbol,
+.cv-product-weight {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 245, 225, 0.9);
+    border-radius: 3px;
+    padding: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #25394b;
+    white-space: nowrap;
+}
+
+.cv-product-approaching {
+    animation: cv-product-arrive 3s linear both;
+}
+
+.cv-product-waiting {
+    transform: translateX(-50%);
+}
+
+.cv-product-passing {
+    animation: cv-product-leave 2.2s linear both;
+}
+
+.cv-product-rejected {
+    background: linear-gradient(135deg, #e96377, #a91f3b);
+    border-color: #ffacb8;
+    animation: cv-reject-pulse 0.55s ease-in-out infinite alternate;
+}
+
+.cv-pass-mark,
+.cv-reject-mark {
+    position: absolute;
+    top: -26px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.cv-pass-mark {
+    background: #166534;
+    color: #fff;
+}
+
+.cv-reject-mark {
+    background: #b91c1c;
+    color: #fff;
+}
+
+.cv-in-label,
+.cv-out-label {
+    position: absolute;
+    top: 105px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #9ec6df;
+}
+
+.cv-in-label {
+    left: 5%;
+}
+
+.cv-out-label {
+    right: 5%;
+}
+
+.cv-stage-message {
+    min-height: 63px;
+    text-align: center;
+    padding: 12px 8px 8px;
+}
+
+.cv-stage-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.cv-stage-description {
+    font-size: 11px;
+    color: #b2cce1;
+    margin-top: 5px;
+}
+
+.cv-scene-footer {
+    border-top: 1px solid rgba(151, 190, 220, 0.2);
+    padding-top: 12px;
+}
+
+    .cv-scene-footer strong {
+        color: #eaf4fd;
+    }
+
+        .cv-scene-footer strong.cv-green {
+            color: #4ade80;
+        }
+
+.cv-data-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.cv-data-item {
+    background: #f3f7fb;
+    border: 1px solid #e5edf4;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+    .cv-data-item span {
+        font-size: 10px;
+        font-weight: 700;
+        color: #778aa0;
+    }
+
+    .cv-data-item strong {
+        font-size: 14px;
+        color: #183650;
+    }
+
+.cv-note {
+    font-size: 11px;
+    color: #8a9bab;
+    margin-top: 13px;
+    line-height: 1.6;
+}
+
+@keyframes cv-belt-scroll {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(26px);
+    }
+}
+
+@keyframes cv-roller-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes cv-product-arrive {
+    from {
+        left: -80px;
+        transform: translateX(0);
+    }
+
+    to {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes cv-product-leave {
+    from {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    to {
+        left: calc(100% + 80px);
+        transform: translateX(0);
+    }
+}
+
+@keyframes cv-reject-pulse {
+    from {
+        box-shadow: 0 0 7px rgba(239, 68, 68, 0.45);
+    }
+
+    to {
+        box-shadow: 0 0 23px rgba(239, 68, 68, 0.9);
+    }
+}
+
+@media (max-width: 700px) {
+    .cv-card {
+        padding: 12px;
+    }
+
+    .cv-data-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cv-animation-area {
+        height: 210px;
+    }
+
+    .cv-product {
+        width: 64px;
+        height: 49px;
+        top: 88px;
+    }
+
+    .cv-title {
+        font-size: 15px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cv-moving,
+    .cv-spinning,
+    .cv-product-rejected {
+        animation: none;
+    }
+}

@@ -1,0 +1,396 @@
+﻿@namespace CA2_Project.Components.Shared
+@using System.Threading
+@using System.Threading.Tasks
+@implements IAsyncDisposable
+
+<div class="cv-card">
+    <div class="cv-header">
+        <div>
+            <div class="cv-title">Automatic Weight Inspection Conveyor</div>
+            <div class="cv-subtitle">
+                PLC / MQTT-Based Product Inspection Simulation
+            </div>
+        </div>
+        <span class="cv-badge @StatusClass">@StatusText</span>
+    </div>
+
+    <div class="cv-scene">
+        <div class="cv-scene-top">
+            <span>WEIGHT INSPECTION STATION</span>
+            <span class="cv-mode">
+                @(IsMqttMode ? "LIVE MQTT" : "SIMULATION")
+            </span>
+        </div>
+
+        <div class="cv-animation-area">
+            <div class="cv-sensor @(HasData && IsDetected ? "cv-detected" : "")">
+                <div class="cv-sensor-body">
+                    <div class="cv-sensor-light"></div>
+                </div>
+                <div class="cv-sensor-beam"></div>
+                <div class="cv-sensor-label">PNP SENSOR</div>
+            </div>
+
+            @if (ShowProduct)
+            {
+                <div class="cv-product @ProductClass">
+                    <div class="cv-product-tape"></div>
+
+                    @if (ShowWeightOnProduct)
+                    {
+                        <span class="cv-product-weight">
+                            @WeightKg.ToString("F2") kg
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="cv-product-symbol">PRODUCT</span>
+                    }
+
+                    @if (_phase == InspectionPhase.Rejected)
+                    {
+                        <span class="cv-reject-mark">REJECT</span>
+                    }
+                    else if (_phase == InspectionPhase.Passing)
+                    {
+                        <span class="cv-pass-mark">PASS</span>
+                    }
+                </div>
+            }
+
+            <div class="cv-conveyor">
+                <div class="cv-belt">
+                    <div class="cv-belt-pattern @(BeltAnimated ? "cv-moving" : "")"></div>
+                </div>
+
+                <div class="cv-roller cv-roller-left @(BeltAnimated ? "cv-spinning" : "")">
+                    <div class="cv-roller-center"></div>
+                </div>
+
+                <div class="cv-roller cv-roller-right @(BeltAnimated ? "cv-spinning" : "")">
+                    <div class="cv-roller-center"></div>
+                </div>
+
+                <div class="cv-leg cv-leg-left"></div>
+                <div class="cv-leg cv-leg-right"></div>
+            </div>
+
+            <div class="cv-in-label">IN</div>
+            <div class="cv-out-label">OUT</div>
+        </div>
+
+        <div class="cv-stage-message">
+            <div class="cv-stage-title">@StageTitle</div>
+            <div class="cv-stage-description">@StageDescription</div>
+        </div>
+
+        <div class="cv-scene-footer">
+            <span>
+                PNP:
+                <strong class="@(HasData && IsDetected ? "cv-green" : "")">
+                    @(HasData ? (IsDetected ? "DETECTED" : "NOT DETECTED") : "NO DATA")
+                </strong>
+            </span>
+
+            <span>
+                PLC CONVEYOR:
+                <strong>
+                    @(HasData ? (IsRunning ? "RUNNING" : "STOPPED") : "NO DATA")
+                </strong>
+            </span>
+        </div>
+    </div>
+
+    <div class="cv-data-grid">
+        <div class="cv-data-item">
+            <span>CONVEYOR STATUS</span>
+            <strong>@(HasData ? (IsRunning ? "RUNNING" : "STOPPED") : "NO DATA")</strong>
+        </div>
+
+        <div class="cv-data-item">
+            <span>SIMULATED WEIGHT</span>
+            <strong>@(HasData ? $"{WeightKg:F2} kg" : "--")</strong>
+        </div>
+
+        <div class="cv-data-item">
+            <span>PNP SENSOR</span>
+            <strong>@(HasData ? (IsDetected ? "DETECTED" : "NOT DETECTED") : "NO DATA")</strong>
+        </div>
+
+        <div class="cv-data-item">
+            <span>WEIGHT LIMIT</span>
+            <strong>@WeightLimitKg.ToString("F2") kg</strong>
+        </div>
+    </div>
+
+    <div class="cv-note">
+        Educational conveyor visualization. Product position and inspection pause
+        are simulated; PLC RunEnable and overweight protection remain unchanged.
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsRunning { get; set; }
+    [Parameter] public bool IsDetected { get; set; }
+    [Parameter] public double WeightKg { get; set; }
+    [Parameter] public double WeightLimitKg { get; set; } = 5.0;
+    [Parameter] public bool HasData { get; set; }
+    [Parameter] public bool AlarmLatched { get; set; }
+    [Parameter] public bool IsMqttMode { get; set; }
+
+    private enum InspectionPhase
+    {
+        Offline,
+        Stopped,
+        Approaching,
+        Waiting,
+        Passing,
+        Clearance,
+        Rejected,
+        Removed
+    }
+
+    private InspectionPhase _phase = InspectionPhase.Offline;
+    private double _elapsed;
+    private readonly CancellationTokenSource _cts = new();
+
+    private const double ApproachSeconds = 3.0;
+    private const double PassSeconds = 2.2;
+    private const double RejectSeconds = 1.6;
+    private const double ClearanceSeconds = 0.5;
+
+    private bool IsOverweight =>
+        HasData &&
+        IsDetected &&
+        WeightKg > WeightLimitKg;
+
+    private bool ShowProduct =>
+        HasData &&
+        _phase is InspectionPhase.Approaching
+            or InspectionPhase.Waiting
+            or InspectionPhase.Passing
+            or InspectionPhase.Rejected;
+
+    private bool ShowWeightOnProduct =>
+        _phase is InspectionPhase.Passing
+            or InspectionPhase.Rejected;
+
+    private bool BeltAnimated =>
+      HasData &&
+      IsRunning &&
+      !AlarmLatched &&
+      !IsOverweight &&
+      _phase != InspectionPhase.Rejected &&
+      _phase != InspectionPhase.Removed;
+
+    private string ProductClass => _phase switch
+    {
+        InspectionPhase.Approaching => "cv-product-approaching",
+        InspectionPhase.Waiting => "cv-product-waiting",
+        InspectionPhase.Passing => "cv-product-passing",
+        InspectionPhase.Rejected => "cv-product-rejected",
+        _ => ""
+    };
+
+    private string StatusText
+    {
+        get
+        {
+            if (!HasData)
+                return "NO DATA";
+
+            if (_phase is InspectionPhase.Rejected or InspectionPhase.Removed)
+                return "REJECTED";
+
+            if (AlarmLatched)
+                return "ALARM LATCHED";
+
+            if (_phase == InspectionPhase.Waiting)
+                return "WAITING FOR SENSOR";
+
+            if (_phase == InspectionPhase.Passing)
+                return "PASS";
+
+            return IsRunning ? "RUNNING" : "STOPPED";
+        }
+    }
+
+    private string StatusClass
+    {
+        get
+        {
+            if (!HasData)
+                return "cv-status-offline";
+
+            if (_phase is InspectionPhase.Rejected or InspectionPhase.Removed ||
+                AlarmLatched)
+                return "cv-status-reject";
+
+            if (_phase == InspectionPhase.Passing)
+                return "cv-status-pass";
+
+            if (_phase == InspectionPhase.Waiting)
+                return "cv-status-wait";
+
+            return IsRunning ? "cv-status-running" : "cv-status-stopped";
+        }
+    }
+
+    private string StageTitle => _phase switch
+    {
+        InspectionPhase.Offline => "COMMUNICATION UNAVAILABLE",
+        InspectionPhase.Stopped => "CONVEYOR STOPPED",
+        InspectionPhase.Approaching => "PRODUCT APPROACHING",
+        InspectionPhase.Waiting => "WAITING FOR PNP DETECTION",
+        InspectionPhase.Passing => "NORMAL WEIGHT - PASS",
+        InspectionPhase.Clearance => "PRODUCT PASSED INSPECTION",
+        InspectionPhase.Rejected => "OVERWEIGHT - REJECT",
+        InspectionPhase.Removed => "PRODUCT REMOVED - WAITING FOR RESTART",
+        _ => "STANDBY"
+    };
+
+    private string StageDescription => _phase switch
+    {
+        InspectionPhase.Offline =>
+            "Waiting for valid monitoring data.",
+
+        InspectionPhase.Stopped =>
+            "Press NP9 or use the existing START command.",
+
+        InspectionPhase.Approaching =>
+            "Product is moving toward the inspection station.",
+
+        InspectionPhase.Waiting =>
+            "Product is at the sensor. Trigger the physical PNP sensor.",
+
+        InspectionPhase.Passing =>
+            $"{WeightKg:F2} kg is within the {WeightLimitKg:F2} kg limit. Product accepted.",
+
+        InspectionPhase.Clearance =>
+            "Accepted product has left the inspection station.",
+
+        InspectionPhase.Rejected =>
+            $"{WeightKg:F2} kg exceeds the {WeightLimitKg:F2} kg limit. Product rejected.",
+
+        InspectionPhase.Removed =>
+            "Remove the detected product, restore normal weight, then restart the PLC.",
+
+        _ => ""
+    };
+
+    protected override void OnInitialized()
+    {
+        _ = RunAnimationLoopAsync(_cts.Token);
+    }
+
+    private void SetPhase(InspectionPhase phase)
+    {
+        if (_phase == phase)
+            return;
+
+        _phase = phase;
+        _elapsed = 0;
+    }
+
+    private void UpdateAnimation(double deltaSeconds)
+    {
+        if (!HasData)
+        {
+            SetPhase(InspectionPhase.Offline);
+            return;
+        }
+
+        // A detected overweight condition takes priority,
+        // even when PLC RunEnable has already changed to FALSE.
+        if (IsOverweight &&
+            _phase != InspectionPhase.Rejected &&
+            _phase != InspectionPhase.Removed)
+        {
+            SetPhase(InspectionPhase.Rejected);
+            return;
+        }
+
+        // Keep the local reject visualization until the product
+        // has been removed and the PLC is ready to restart.
+        if (_phase == InspectionPhase.Rejected)
+        {
+            _elapsed += deltaSeconds;
+
+            if (_elapsed >= RejectSeconds)
+                SetPhase(InspectionPhase.Removed);
+
+            return;
+        }
+
+        if (_phase == InspectionPhase.Removed)
+        {
+            if (IsRunning && !IsDetected && !AlarmLatched)
+                SetPhase(InspectionPhase.Approaching);
+
+            return;
+        }
+
+        if (!IsRunning || AlarmLatched)
+        {
+            SetPhase(InspectionPhase.Stopped);
+            return;
+        }
+
+        if (_phase is InspectionPhase.Offline or InspectionPhase.Stopped)
+        {
+            SetPhase(InspectionPhase.Approaching);
+            return;
+        }
+
+        _elapsed += deltaSeconds;
+        switch (_phase)
+        {
+            case InspectionPhase.Approaching:
+                if (_elapsed >= ApproachSeconds)
+                    SetPhase(InspectionPhase.Passing);
+                break;
+
+            case InspectionPhase.Waiting:
+                SetPhase(InspectionPhase.Passing);
+                break;
+
+            case InspectionPhase.Passing:
+                if (_elapsed >= PassSeconds)
+                    SetPhase(InspectionPhase.Clearance);
+                break;
+
+            case InspectionPhase.Clearance:
+                if (_elapsed >= ClearanceSeconds)
+                    SetPhase(InspectionPhase.Approaching);
+                break;
+        }
+    }
+
+    private async Task RunAnimationLoopAsync(CancellationToken token)
+    {
+        try
+        {
+            using var timer =
+                new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                await InvokeAsync(() =>
+                {
+                    UpdateAnimation(0.1);
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal component disposal.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _cts.CancelAsync();
+        _cts.Dispose();
+    }
+}

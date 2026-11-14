@@ -1,0 +1,341 @@
+﻿@using Microsoft.AspNetCore.Components
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between
+            align-items-center mb-3">
+
+            <div>
+                <h5 class="mb-1">Weight Monitoring</h5>
+                <small class="text-muted">
+                    Industrial Conveyor -
+                    Simulated Weight Input
+                </small>
+            </div>
+
+            @if (IsOverweight)
+            {
+                <span class="badge bg-danger">
+                    OVERWEIGHT
+                </span>
+            }
+            else
+            {
+                <span class="badge bg-success">
+                    NORMAL
+                </span>
+            }
+        </div>
+
+        <!-- WEIGHT DISPLAY -->
+        <div class="bg-light rounded p-4 text-center mb-3">
+
+            <div class="text-muted mb-1">
+                Current Simulated Weight
+            </div>
+
+            <h1 class="@(IsOverweight
+                                         ? "text-danger"
+                                         : "text-success")">
+
+                @WeightKg.ToString("F2") kg
+
+            </h1>
+
+            <small class="text-muted">
+                Software-simulated weight.
+                No physical load cell connected.
+            </small>
+        </div>
+
+        <!-- WEIGHT INPUT -->
+        <div class="mb-4">
+
+            <div class="d-flex justify-content-between">
+                <label class="form-label fw-bold">
+                    Weight Input
+                </label>
+
+                <span>
+                    @WeightKg.ToString("F2") kg
+                </span>
+            </div>
+
+            <input type="range"
+                   class="form-range"
+                   min="0"
+                   max="10"
+                   step="0.1"
+                   @bind="WeightKg"
+                   @bind:event="oninput"
+                   @bind:after="EvaluateWeightAsync" />
+
+            <div class="d-flex justify-content-between
+                text-muted small">
+                <span>0 kg</span>
+                <span>10 kg</span>
+            </div>
+        </div>
+
+        <!-- THRESHOLD -->
+        <div class="mb-3">
+
+            <div class="d-flex justify-content-between">
+                <label class="form-label fw-bold">
+                    Maximum Weight Threshold
+                </label>
+
+                <span>
+                    @ThresholdKg.ToString("F2") kg
+                </span>
+            </div>
+
+            <input type="range"
+                   class="form-range"
+                   min="0.5"
+                   max="10"
+                   step="0.5"
+                   @bind="ThresholdKg"
+                   @bind:event="oninput"
+                   @bind:after="EvaluateWeightAsync" />
+
+        </div>
+
+        <!-- ALARM -->
+        @if (IsOverweight)
+        {
+            <div class="alert alert-danger">
+
+                <strong>OVERWEIGHT ALERT</strong>
+
+                <div>
+                    Weight exceeds maximum limit.
+                </div>
+
+                <div>
+                    Current Weight:
+                    @WeightKg.ToString("F2") kg
+                </div>
+
+                <div>
+                    Maximum Weight:
+                    @ThresholdKg.ToString("F2") kg
+                </div>
+
+                <div>
+                    Excess Weight:
+                    @(WeightKg - ThresholdKg).ToString("F2") kg
+                </div>
+
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-success">
+
+                <strong>Weight Normal</strong>
+
+                <div>
+                    Weight is within the acceptable limit.
+                </div>
+
+            </div>
+        }
+
+        <!-- RESET -->
+        <button class="btn btn-outline-secondary btn-sm"
+                @onclick="ResetWeightAsync">
+
+            Reset Weight
+
+        </button>
+
+    </div>
+</div>
+
+
+<!-- WEIGHT EVENT HISTORY -->
+<div class="card shadow-sm mb-3">
+
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between
+            align-items-center mb-3">
+
+            <h5 class="mb-0">
+                Weight Event History
+            </h5>
+
+            <button class="btn btn-outline-secondary btn-sm"
+                    @onclick="ClearWeightHistory">
+
+                Clear History
+
+            </button>
+
+        </div>
+
+        @if (WeightEvents.Count == 0)
+        {
+            <p class="text-muted mb-0">
+                No weight events recorded.
+            </p>
+        }
+        else
+        {
+            <div class="table-responsive">
+
+                <table class="table table-sm table-striped">
+
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Event</th>
+                            <th>Weight</th>
+                            <th>Threshold</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var item in WeightEvents)
+                        {
+                            <tr>
+                                <td>
+                                    @item.Time.ToString("HH:mm:ss")
+                                </td>
+
+                                <td>
+                                    <span class="badge @(item.IsAlarm
+                                                                                ? "bg-danger"
+                                                                                : "bg-success")">
+
+                                        @item.EventName
+
+                                    </span>
+                                </td>
+
+                                <td>
+                                    @item.Weight.ToString("F2") kg
+                                </td>
+
+                                <td>
+                                    @item.Threshold.ToString("F2") kg
+                                </td>
+                            </tr>
+                        }
+
+                    </tbody>
+                </table>
+
+            </div>
+        }
+
+    </div>
+</div>
+
+
+@code {
+
+    // ==========================================
+    // WEIGHT SETTINGS
+    // ==========================================
+
+    private double WeightKg = 2.5;
+
+    private double ThresholdKg = 5.0;
+
+    private bool PreviousAlarmState = false;
+
+    private bool IsOverweight =>
+        WeightKg > ThresholdKg;
+
+
+    // ==========================================
+    // EVENT HISTORY
+    // ==========================================
+
+    private sealed record WeightEventRecord(
+        DateTime Time,
+        string EventName,
+        double Weight,
+        double Threshold,
+        bool IsAlarm
+    );
+
+    private readonly List<WeightEventRecord>
+        WeightEvents = new();
+
+
+    // Optional callback to the parent Dashboard
+    [Parameter]
+    public EventCallback<string> OnWeightEvent { get; set; }
+
+
+    // ==========================================
+    // WEIGHT / THRESHOLD EVALUATION
+    // ==========================================
+
+    private async Task EvaluateWeightAsync()
+    {
+        bool CurrentAlarmState = IsOverweight;
+
+        // Only log when alarm state changes
+        if (CurrentAlarmState != PreviousAlarmState)
+        {
+            string EventName = CurrentAlarmState
+                ? "OVERWEIGHT ALERT"
+                : "WEIGHT RECOVERED";
+
+            var entry = new WeightEventRecord(
+                DateTime.Now,
+                EventName,
+                WeightKg,
+                ThresholdKg,
+                CurrentAlarmState
+            );
+
+            WeightEvents.Insert(0, entry);
+
+            // Keep the latest 30 events
+            if (WeightEvents.Count > 30)
+            {
+                WeightEvents.RemoveAt(
+                    WeightEvents.Count - 1
+                );
+            }
+
+            PreviousAlarmState = CurrentAlarmState;
+
+            // Notify parent if connected
+            await OnWeightEvent.InvokeAsync(
+                $"{EventName}: " +
+                $"Weight={WeightKg:F2} kg, " +
+                $"Limit={ThresholdKg:F2} kg"
+            );
+        }
+    }
+
+
+    // ==========================================
+    // RESET WEIGHT
+    // ==========================================
+
+    private async Task ResetWeightAsync()
+    {
+        WeightKg = 0.0;
+
+        await EvaluateWeightAsync();
+    }
+
+
+    // ==========================================
+    // CLEAR HISTORY
+    // ==========================================
+
+    private void ClearWeightHistory()
+    {
+        WeightEvents.Clear();
+    }
+}

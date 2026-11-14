@@ -1,0 +1,133 @@
+.industrial-page {
+    max-width: 1450px;
+    margin: auto;
+    padding: 22px;
+    color: #1e293b;
+}
+
+.industrial-header {
+    background: linear-gradient(120deg, #122b49, #17628a);
+    color: white;
+    padding: 26px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+}
+
+.industrial-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    height: 100%;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+}
+
+    .industrial-card h5 {
+        color: #173955;
+        font-weight: 700;
+        margin-bottom: 15px;
+    }
+
+.industrial-section {
+    margin: 24px 0 14px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #173955;
+}
+
+.industrial-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.industrial-grid-two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.industrial-label {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.industrial-value {
+    font-size: 1.9rem;
+    font-weight: 750;
+    margin-top: 8px;
+    overflow-wrap: anywhere;
+}
+
+.industrial-good {
+    color: #15803d;
+}
+
+.industrial-danger {
+    color: #dc2626;
+}
+
+.industrial-muted {
+    color: #64748b;
+}
+
+.industrial-warning {
+    color: #b45309;
+}
+
+.industrial-reading {
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 22px;
+    text-align: center;
+}
+
+.industrial-reading-number {
+    font-size: 2.7rem;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.industrial-message {
+    padding: 14px;
+    border-radius: 8px;
+    background: #0f172a;
+    color: #bae6fd;
+    font-family: Consolas, monospace;
+    font-size: 0.83rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.industrial-log {
+    max-height: 420px;
+    overflow: auto;
+}
+
+.industrial-info {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 12px;
+    color: #1e40af;
+    font-size: 0.86rem;
+}
+
+@media (max-width: 1100px) {
+    .industrial-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .industrial-grid,
+    .industrial-grid-two {
+        grid-template-columns: 1fr;
+    }
+
+    .industrial-page {
+        padding: 12px;
+    }
+}
